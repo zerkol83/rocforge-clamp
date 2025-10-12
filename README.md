@@ -4,7 +4,7 @@ Clamp is a foundational subsystem in the ROCForge toolchain designed to provide 
 
 Where ROCForge orchestrates large-scale GPU/CPU workloads, Clamp acts as its stabilizer — detecting, isolating, and controlling volatile runtime states that arise from entropy-driven scheduling, thread divergence, or inconsistent memory visibility across the ROCm stack.
 
-Clamp exposes a simple C++20 API (ClampAnchor) that lets higher-level modules “lock” execution environments, synchronize memory anchors, and safely “release” them once integrity checks pass. Internally it leverages ROCm primitives (HIP streams, rocBLAS handles) and custom vector semantics to enforce reproducible state transitions even under stochastic or entropy-weighted scheduling.
+Clamp exposes a simple C++20 API (ClampAnchor) that lets higher-level modules “lock” execution environments, synchronize memory anchors, and safely “release” them once integrity checks pass. ClampAnchor now relies on RAII semantics so anchors lock during construction and release automatically on scope exit. Each anchor also tracks a lightweight entropy seed derived from clock and thread identifiers, making HIP kernel seeding deterministic while preparing for ROCForge’s future global entropy model. Internally it leverages ROCm primitives (HIP streams, rocBLAS handles) and custom vector semantics to enforce reproducible state transitions even under stochastic or entropy-weighted scheduling.
 
 The project’s immediate goals are:
 
