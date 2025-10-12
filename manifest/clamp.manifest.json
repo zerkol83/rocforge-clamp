@@ -1,0 +1,27 @@
+{
+  "name": "Clamp",
+  "version": "0.1.0",
+  "description": "Clamp module for ROCForge providing basic anchor locking utilities.",
+  "library": "libclamp.a",
+  "tests": [
+    "clamp_test"
+  ],
+  "dependencies": [
+    {
+      "name": "HIP",
+      "cmake": "HIP"
+    },
+    {
+      "name": "rocBLAS",
+      "cmake": "rocblas"
+    }
+  ],
+  "build": {
+    "generator": "Ninja",
+    "toolchain": "Clang",
+    "cmake_minimum_required": "3.21",
+    "standards": [
+      "C++20"
+    ]
+  }
+}
