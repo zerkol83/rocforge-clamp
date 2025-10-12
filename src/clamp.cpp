@@ -45,15 +45,23 @@ ClampAnchor::~ClampAnchor() {
 }
 
 ClampAnchor::ClampAnchor(ClampAnchor&& other) noexcept
-    : state_(std::move(other.state_)) {
+    : state_(std::move(other.state_)),
+      telemetry_(other.telemetry_),
+      activeTelemetryRecord_(other.activeTelemetryRecord_) {
     other.state_ = {};
+    other.telemetry_ = nullptr;
+    other.activeTelemetryRecord_.reset();
 }
 
 ClampAnchor& ClampAnchor::operator=(ClampAnchor&& other) noexcept {
     if (this != &other) {
         release_internal("operator=");
         state_ = std::move(other.state_);
+        telemetry_ = other.telemetry_;
+        activeTelemetryRecord_ = other.activeTelemetryRecord_;
         other.state_ = {};
+        other.telemetry_ = nullptr;
+        other.activeTelemetryRecord_.reset();
     }
     return *this;
 }
@@ -74,6 +82,9 @@ void ClampAnchor::lock(const std::string& ctx) {
     state_.entropySeed = tracker_.generateSeed();
     setState(AnchorState::Locked,
              "Lock acquired for context '" + ctx + "', seed " + std::to_string(state_.entropySeed));
+    if (telemetry_) {
+        activeTelemetryRecord_ = telemetry_->recordAcquire(state_, ctx);
+    }
 }
 
 void ClampAnchor::release() {
@@ -91,12 +102,20 @@ void ClampAnchor::release_internal(const char* sourceTag) {
     }
 
     const std::string ctx = state_.context;
+    const std::uint64_t seedSnapshot = state_.entropySeed;
     setState(AnchorState::Released,
              std::string(sourceTag) + " releasing context '" + ctx + '\'');
     state_.context.clear();
     state_.entropySeed = 0;
     setState(AnchorState::Unlocked,
              std::string(sourceTag) + " anchor reset to unlocked");
+    if (telemetry_ && activeTelemetryRecord_) {
+        AnchorStatus snapshot = state_;
+        snapshot.context = ctx;
+        snapshot.entropySeed = seedSnapshot;
+        telemetry_->recordRelease(*activeTelemetryRecord_, snapshot, ctx);
+    }
+    activeTelemetryRecord_.reset();
 }
 
 AnchorStatus ClampAnchor::status() const {
@@ -107,6 +126,14 @@ std::uint64_t ClampAnchor::entropySeed() const {
     return state_.entropySeed;
 }
 
+void ClampAnchor::attachTelemetry(EntropyTelemetry* telemetry) {
+    telemetry_ = telemetry;
+}
+
+const EntropyTelemetry* ClampAnchor::telemetry() const {
+    return telemetry_;
+}
+
 void ClampAnchor::setState(AnchorState newState, const std::string& reason) {
     if (newState == state_.state) {
         return;
@@ -115,15 +142,15 @@ void ClampAnchor::setState(AnchorState newState, const std::string& reason) {
     const auto now = std::chrono::system_clock::now();
     const std::tm local = toLocalTime(now);
 
-    std::cout << "[ClampAnchor] " << stateToString(state_.state)
-              << " -> " << stateToString(newState)
+    std::cout << "[ClampAnchor] " << anchorStateName(state_.state)
+              << " -> " << anchorStateName(newState)
               << " @ " << std::put_time(&local, "%F %T")
               << " | " << reason << '\n';
 
     state_.state = newState;
 }
 
-const char* ClampAnchor::stateToString(AnchorState state) {
+const char* anchorStateName(AnchorState state) {
     switch (state) {
     case AnchorState::Unlocked:
         return "Unlocked";

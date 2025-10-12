@@ -1,7 +1,12 @@
 #pragma once
 
+#include <chrono>
 #include <cstdint>
+#include <mutex>
+#include <optional>
 #include <string>
+#include <thread>
+#include <vector>
 
 namespace clamp {
 
@@ -18,9 +23,34 @@ struct AnchorStatus {
     std::uint64_t entropySeed{0};
 };
 
+struct AnchorTelemetryRecord {
+    std::uint64_t seed{0};
+    std::string context;
+    std::string threadId;
+    std::chrono::system_clock::time_point acquiredAt{};
+    std::optional<std::chrono::system_clock::time_point> releasedAt;
+    AnchorState finalState{AnchorState::Unlocked};
+    double durationMs{0.0};
+};
+
 class EntropyTracker {
 public:
     std::uint64_t generateSeed() const;
+};
+
+class EntropyTelemetry {
+public:
+    std::size_t recordAcquire(const AnchorStatus& status, const std::string& ctx);
+    void recordRelease(std::size_t recordId, const AnchorStatus& status, const std::string& ctx);
+    std::string toJson() const;
+    std::vector<AnchorTelemetryRecord> records() const;
+
+private:
+    static std::string formatTime(const std::chrono::system_clock::time_point& tp);
+    static std::string threadIdToString(const std::thread::id& threadId);
+
+    mutable std::mutex mutex_;
+    std::vector<AnchorTelemetryRecord> records_;
 };
 
 class ClampAnchor {
@@ -38,14 +68,20 @@ public:
     void release();
     AnchorStatus status() const;
     std::uint64_t entropySeed() const;
+    void attachTelemetry(EntropyTelemetry* telemetry);
+    const EntropyTelemetry* telemetry() const;
 
 private:
     void release_internal(const char* sourceTag);
     void setState(AnchorState newState, const std::string& reason);
-    static const char* stateToString(AnchorState state);
 
     AnchorStatus state_;
     EntropyTracker tracker_;
+    EntropyTelemetry* telemetry_{nullptr};
+    std::optional<std::size_t> activeTelemetryRecord_;
 };
+
+bool runHipEntropyMirror(const std::vector<std::uint64_t>& seeds, const std::vector<int>& states);
+const char* anchorStateName(AnchorState state);
 
 } // namespace clamp

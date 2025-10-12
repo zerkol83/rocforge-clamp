@@ -1,0 +1,30 @@
+Start testing: Oct 12 17:28 CDT
+----------------------------------------------------------
+1/1 Testing: clamp_test
+1/1 Test: clamp_test
+Command: "/home/zerkol/Dev/rocforge/clamp/clamp_test"
+Directory: /home/zerkol/Dev/rocforge/clamp
+"clamp_test" start time: Oct 12 17:28 CDT
+Output:
+----------------------------------------------------------
+[ClampAnchor] Unlocked -> Locked @ 2025-10-12 17:28:18 | Lock acquired for context 'scoped-context', seed 7701177092283401962
+[ClampAnchor] Locked -> Released @ 2025-10-12 17:28:18 | ~ClampAnchor releasing context 'scoped-context'
+[ClampAnchor] Released -> Unlocked @ 2025-10-12 17:28:18 | ~ClampAnchor anchor reset to unlocked
+[ClampAnchor] Unlocked -> Locked @ 2025-10-12 17:28:18 | Lock acquired for context 'unit-test', seed 7701177092283398725
+[ClampAnchor] Locked -> Released @ 2025-10-12 17:28:18 | release() releasing context 'unit-test'
+[ClampAnchor] Released -> Unlocked @ 2025-10-12 17:28:18 | release() anchor reset to unlocked
+[ClampAnchor] Unlocked -> Locked @ 2025-10-12 17:28:18 | Lock acquired for context 'cycle-test', seed 7701177092283392293
+[ClampAnchor] Locked -> Released @ 2025-10-12 17:28:18 | release() releasing context 'cycle-test'
+[ClampAnchor] Released -> Unlocked @ 2025-10-12 17:28:18 | release() anchor reset to unlocked
+[ClampAnchor] Unlocked -> Locked @ 2025-10-12 17:28:18 | Lock acquired for context 'cycle-test', seed 7701177092284523046
+[ClampAnchor] Locked -> Released @ 2025-10-12 17:28:18 | release() releasing context 'cycle-test'
+[ClampAnchor] Released -> Unlocked @ 2025-10-12 17:28:18 | release() anchor reset to unlocked
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"clamp_test" end time: Oct 12 17:28 CDT
+"clamp_test" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 12 17:28 CDT

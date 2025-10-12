@@ -1,0 +1,5 @@
+/home/zerkol/Dev/rocforge/clamp/CMakeFiles/clamp.dir
+/home/zerkol/Dev/rocforge/clamp/CMakeFiles/clamp_test.dir
+/home/zerkol/Dev/rocforge/clamp/CMakeFiles/test.dir
+/home/zerkol/Dev/rocforge/clamp/CMakeFiles/edit_cache.dir
+/home/zerkol/Dev/rocforge/clamp/CMakeFiles/rebuild_cache.dir

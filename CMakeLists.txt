@@ -7,10 +7,20 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(HIP REQUIRED)
+enable_language(HIP)
 find_package(rocblas REQUIRED)
 
 add_library(clamp STATIC
     src/clamp.cpp
+    src/telemetry/entropy_telemetry.cpp
+    src/telemetry/entropy_validation.cpp
+    src/telemetry/entropy_validation.hip
+)
+
+set_source_files_properties(
+    src/telemetry/entropy_validation.hip
+    PROPERTIES
+        LANGUAGE HIP
 )
 
 target_include_directories(clamp

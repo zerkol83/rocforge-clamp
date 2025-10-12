@@ -1,0 +1,5 @@
+# ninja log v6
+1	897	1760308029628597118	CMakeFiles/clamp.dir/src/clamp.cpp.o	6748c9abc651eb79
+2	75	1760308097485581183	libclamp.a	ec00dcf3ab6f02e4
+2	842	1760308097485581183	CMakeFiles/clamp_test.dir/tests/test_clamp.cpp.o	196d7b68af5919c9
+842	903	1760308098325593365	clamp_test	8d15dad7ca0f03a1
