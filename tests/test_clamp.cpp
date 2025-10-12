@@ -1,7 +1,12 @@
 #include "clamp.h"
+#include "clamp/EntropyTelemetry.h"
+
 #include <cassert>
 #include <chrono>
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <mutex>
 #include <numeric>
 #include <string>
@@ -124,21 +129,48 @@ void validate_telemetry(const clamp::EntropyTelemetry& telemetry) {
     assert(!records.empty());
     for (const auto& record : records) {
         assert(!record.context.empty());
-        assert(record.seed != 0 || record.finalState == clamp::AnchorState::Unlocked);
+        assert(record.seed != 0);
         assert(record.acquiredAt.time_since_epoch().count() != 0);
         if (record.releasedAt) {
             assert(record.durationMs >= 0.0);
         }
+        assert(record.stabilityScore >= 0.0);
+        assert(record.stabilityScore <= 1.0);
     }
 
     const std::string json = telemetry.toJson();
     assert(json.find("\"records\"") != std::string::npos);
     assert(json.find("\"seed\"") != std::string::npos);
+    assert(json.find("\"stability_score\"") != std::string::npos);
 }
 
 void validate_hip_mirror(const std::vector<std::uint64_t>& seeds,
                          const std::vector<int>& states) {
     assert(clamp::runHipEntropyMirror(seeds, states));
+}
+
+void validate_file_export(const clamp::EntropyTelemetry& telemetry) {
+    const auto outputDir = std::filesystem::current_path() / "telemetry";
+    std::error_code ec;
+    std::filesystem::remove_all(outputDir, ec);
+    ec.clear();
+
+    assert(telemetry.writeJSON());
+
+    bool foundFile = false;
+    for (const auto& entry : std::filesystem::directory_iterator(outputDir)) {
+        if (!entry.is_regular_file()) {
+            continue;
+        }
+        foundFile = true;
+        std::ifstream in(entry.path());
+        assert(in.good());
+        std::string contents((std::istreambuf_iterator<char>(in)),
+                             std::istreambuf_iterator<char>());
+        assert(contents.find("\"seed\"") != std::string::npos);
+        assert(contents.find("\"stability_score\"") != std::string::npos);
+    }
+    assert(foundFile);
 }
 
 } // namespace
@@ -154,6 +186,7 @@ int main() {
 
     validate_telemetry(telemetry);
     validate_hip_mirror(seeds, states);
+    validate_file_export(telemetry);
 
     return 0;
 }

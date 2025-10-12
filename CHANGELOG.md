@@ -10,12 +10,20 @@ Summary
 
 Clamp v0.4 evolves the subsystem into a distributed stability evaluator. Temporal scoring converts anchor telemetry into quantitative reproducibility metrics, while enhanced aggregation APIs capture multi-node entropy behaviour and persist JSON logs for downstream ROCForge analytics.
 
+Status Report
+-------------
+
+The telemetry subsystem has been modularized for clarity and reproducibility. The new `include/clamp/EntropyTelemetry.h` defines the core record type and API for entropy session tracking. Its implementation, `src/telemetry/entropy_telemetry.cpp`, captures lock and release events, computes elapsed durations, and aggregates stability scores into a single JSON object written to `build/telemetry/clamp_run_<timestamp>.json` via the `writeJSON` routine.
+
+ClampAnchor now integrates directly with this telemetry layer, emitting deterministic entropy and stability data while maintaining strict RAII semantics. Validation now covers JSON persistence end-to-end: `tests/test_clamp.cpp` verifies file generation and schema correctness, while `tests/test_scoring.cpp` exercises scoring aggregation, temporal alignment, and summary output. Continuous integration preserves runtime artifacts through `.github/workflows/validate.yml`, uploading `clamp_test` and all telemetry exports so every run yields reproducible evidence. Documentation has been synchronized accordingly—`README.md`, `CHANGELOG.md`, and `docs/telemetry_spec.md` reference the schema, field semantics, and reproducibility checks required for v0.4 tagging.
+
 Key Enhancements
 ----------------
 
 - TemporalScoring module computes stability scores, variance metrics, and drift analysis with JSON and plain-text reporting.
 - EntropyTelemetry gains distributed aggregation, timestamp alignment, and filesystem archival capabilities.
 - Expanded CTest coverage validates scoring, multi-thread entropy reproducibility, and HIP mirroring across aggregated datasets.
+- Telemetry schema formally documented in `docs/telemetry_spec.md`, ensuring downstream consumers share a consistent contract.
 - GitHub Actions workflow now runs matrix builds with parallel test execution and publishes telemetry artifacts.
 
 Validation Artifacts

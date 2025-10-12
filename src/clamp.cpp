@@ -1,4 +1,5 @@
 #include "clamp.h"
+#include "clamp/EntropyTelemetry.h"
 
 #include <cassert>
 #include <chrono>
@@ -83,7 +84,7 @@ void ClampAnchor::lock(const std::string& ctx) {
     setState(AnchorState::Locked,
              "Lock acquired for context '" + ctx + "', seed " + std::to_string(state_.entropySeed));
     if (telemetry_) {
-        activeTelemetryRecord_ = telemetry_->recordAcquire(state_, ctx);
+        activeTelemetryRecord_ = telemetry_->recordAcquire(ctx, state_.entropySeed);
     }
 }
 
@@ -110,10 +111,8 @@ void ClampAnchor::release_internal(const char* sourceTag) {
     setState(AnchorState::Unlocked,
              std::string(sourceTag) + " anchor reset to unlocked");
     if (telemetry_ && activeTelemetryRecord_) {
-        AnchorStatus snapshot = state_;
-        snapshot.context = ctx;
-        snapshot.entropySeed = seedSnapshot;
-        telemetry_->recordRelease(*activeTelemetryRecord_, snapshot, ctx);
+        constexpr double kStableScore = 1.0;
+        telemetry_->recordRelease(*activeTelemetryRecord_, ctx, seedSnapshot, kStableScore);
     }
     activeTelemetryRecord_.reset();
 }

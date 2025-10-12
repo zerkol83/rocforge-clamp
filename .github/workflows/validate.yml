@@ -48,3 +48,13 @@ jobs:
           else
             echo "No telemetry data exported."
           fi
+
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clamp-telemetry
+          path: |
+            build/clamp_test
+            build/telemetry/
+          if-no-files-found: warn

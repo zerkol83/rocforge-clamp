@@ -1,9 +1,9 @@
-#include "clamp.h"
+#include "clamp/EntropyTelemetry.h"
 
 #include <ctime>
-#include <iomanip>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <sstream>
 
 namespace clamp {
@@ -49,22 +49,34 @@ std::string escapeJson(const std::string& value) {
     return oss.str();
 }
 
+std::filesystem::path resolveDirectory(const std::filesystem::path& directory) {
+    if (directory.empty()) {
+        return std::filesystem::current_path() / "telemetry";
+    }
+    if (directory.is_absolute()) {
+        return directory;
+    }
+    return std::filesystem::current_path() / directory;
+}
+
 } // namespace
 
-std::size_t EntropyTelemetry::recordAcquire(const AnchorStatus& status, const std::string& ctx) {
+std::size_t EntropyTelemetry::recordAcquire(const std::string& context, std::uint64_t seed) {
     AnchorTelemetryRecord record;
-    record.context = ctx;
-    record.seed = status.entropySeed;
+    record.context = context;
+    record.seed = seed;
     record.threadId = threadIdToString(std::this_thread::get_id());
     record.acquiredAt = std::chrono::system_clock::now();
-    record.finalState = status.state;
 
     std::lock_guard<std::mutex> lock(mutex_);
     records_.push_back(record);
     return records_.size() - 1;
 }
 
-void EntropyTelemetry::recordRelease(std::size_t recordId, const AnchorStatus& status, const std::string& ctx) {
+void EntropyTelemetry::recordRelease(std::size_t recordId,
+                                     const std::string& context,
+                                     std::uint64_t seed,
+                                     double stabilityScore) {
     const auto now = std::chrono::system_clock::now();
 
     std::lock_guard<std::mutex> lock(mutex_);
@@ -74,21 +86,30 @@ void EntropyTelemetry::recordRelease(std::size_t recordId, const AnchorStatus& s
 
     auto& record = records_[recordId];
     record.releasedAt = now;
-    record.finalState = status.state;
     record.durationMs = std::chrono::duration<double, std::milli>(now - record.acquiredAt).count();
+    record.stabilityScore = stabilityScore;
     if (record.context.empty()) {
-        record.context = ctx;
+        record.context = context;
     }
     if (record.seed == 0) {
-        record.seed = status.entropySeed;
+        record.seed = seed;
     }
 }
 
 std::string EntropyTelemetry::toJson() const {
     std::lock_guard<std::mutex> lock(mutex_);
 
+    double scoreSum = 0.0;
+    for (const auto& record : records_) {
+        scoreSum += record.stabilityScore;
+    }
+    const double averageScore = records_.empty() ? 0.0 : scoreSum / static_cast<double>(records_.size());
+
     std::ostringstream oss;
-    oss << "{ \"records\": [";
+    oss << "{";
+    oss << "\"stability_score\":" << std::fixed << std::setprecision(6) << averageScore << ",";
+    oss << std::defaultfloat;
+    oss << "\"records\": [";
     for (std::size_t i = 0; i < records_.size(); ++i) {
         if (i > 0) {
             oss << ", ";
@@ -106,7 +127,7 @@ std::string EntropyTelemetry::toJson() const {
         }
         oss << "\"duration_ms\":" << std::fixed << std::setprecision(3) << record.durationMs << ",";
         oss << std::defaultfloat;
-        oss << "\"final_state\":\"" << anchorStateName(record.finalState) << "\"";
+        oss << "\"stability_score\":" << record.stabilityScore;
         oss << "}";
     }
     oss << "] }";
@@ -162,17 +183,19 @@ void EntropyTelemetry::alignToReference(const std::chrono::system_clock::time_po
     }
 }
 
-bool EntropyTelemetry::writeJson(const std::filesystem::path& directory,
+bool EntropyTelemetry::writeJSON(const std::filesystem::path& directory,
                                  const std::string& filenameHint) const {
     const std::string payload = toJson();
+    const auto resolvedDir = resolveDirectory(directory);
+
     std::error_code ec;
-    std::filesystem::create_directories(directory, ec);
+    std::filesystem::create_directories(resolvedDir, ec);
     if (ec) {
         return false;
     }
 
     const auto filename = makeFilename(filenameHint);
-    const auto fullPath = directory / filename;
+    const auto fullPath = resolvedDir / filename;
     std::ofstream out(fullPath);
     if (!out) {
         return false;

@@ -24,7 +24,7 @@
 
 ## Experimental Protocol
 1. Execute the standard validation loop (`ctest --output-on-failure`) to produce telemetry snapshots.
-2. Inspect the generated JSON (via `EntropyTelemetry::writeJson` or `toJson`) to confirm deterministic seeds, durations, and aligned timestamps.
+2. Inspect the generated JSON (via `EntropyTelemetry::writeJSON` or `toJson`) to confirm deterministic seeds, durations, and aligned timestamps.
 3. Compute stability indices with `TemporalScoring::evaluate` or `evaluateAggregated`, capturing JSON summaries for dashboards.
 4. Review HIP mirror status (available through test assertions) to ensure GPU coherence.
 5. Archive telemetry outputs alongside ROCForge’s global entropy field data for composite system analysis.

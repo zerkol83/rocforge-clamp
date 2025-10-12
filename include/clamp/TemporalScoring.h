@@ -1,6 +1,6 @@
 #pragma once
 
-#include "clamp.h"
+#include "clamp/EntropyTelemetry.h"
 
 #include <string>
 #include <vector>

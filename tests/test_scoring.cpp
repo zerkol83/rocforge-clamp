@@ -1,3 +1,4 @@
+#include "clamp/EntropyTelemetry.h"
 #include "clamp/TemporalScoring.h"
 
 #include <cassert>
@@ -20,8 +21,8 @@ clamp::AnchorTelemetryRecord makeRecord(std::uint64_t seed,
     const auto base = std::chrono::system_clock::time_point{} + std::chrono::hours(1);
     record.acquiredAt = base + offset;
     record.releasedAt = record.acquiredAt + std::chrono::milliseconds(static_cast<long long>(durationMs));
-    record.finalState = clamp::AnchorState::Unlocked;
     record.durationMs = durationMs;
+    record.stabilityScore = 1.0;
     return record;
 }
 
@@ -46,8 +47,8 @@ int main() {
     telemetryB.alignToReference(reference + std::chrono::milliseconds(5));
 
     const auto outputDir = std::filesystem::current_path() / "telemetry";
-    assert(telemetryA.writeJson(outputDir, "unit_a"));
-    assert(telemetryB.writeJson(outputDir, "unit_b"));
+    assert(telemetryA.writeJSON(outputDir, "unit_a"));
+    assert(telemetryB.writeJSON(outputDir, "unit_b"));
 
     clamp::TemporalScoring scoring;
     const auto resultA = scoring.evaluate(telemetryA.records());
