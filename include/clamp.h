@@ -5,8 +5,15 @@
 
 namespace clamp {
 
-struct AnchorState {
-    bool locked{false};
+enum class AnchorState {
+    Unlocked,
+    Locked,
+    Released,
+    Error
+};
+
+struct AnchorStatus {
+    AnchorState state{AnchorState::Unlocked};
     std::string context;
     std::uint64_t entropySeed{0};
 };
@@ -29,13 +36,15 @@ public:
 
     void lock(const std::string& ctx);
     void release();
-    AnchorState status() const;
+    AnchorStatus status() const;
     std::uint64_t entropySeed() const;
 
 private:
-    void release_internal();
+    void release_internal(const char* sourceTag);
+    void setState(AnchorState newState, const std::string& reason);
+    static const char* stateToString(AnchorState state);
 
-    AnchorState state_;
+    AnchorStatus state_;
     EntropyTracker tracker_;
 };
 
