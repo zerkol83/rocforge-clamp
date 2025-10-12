@@ -61,7 +61,7 @@ int main() {
     assert(secondSeed != 0);
     const auto repeatSeed = movedAnchor.entropySeed();
     assert(repeatSeed == secondSeed);
-    assert(secondSeed == movedAnchor.status().entropySeed());
+    assert(secondSeed == movedAnchor.entropySeed());
 
     movedAnchor.release();
     assert(movedAnchor.entropySeed() == 0);
