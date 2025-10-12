@@ -16,6 +16,7 @@ add_library(clamp STATIC
     src/telemetry/entropy_validation.cpp
     src/telemetry/entropy_validation.hip
     src/scoring/TemporalScoring.cpp
+    src/telemetry/temporal_aggregator.cpp
 )
 
 set_source_files_properties(
@@ -57,3 +58,14 @@ target_link_libraries(clamp_scoring_test
 )
 
 add_test(NAME clamp_scoring_test COMMAND clamp_scoring_test)
+
+add_executable(clamp_aggregator_test
+    tests/test_aggregator.cpp
+)
+
+target_link_libraries(clamp_aggregator_test
+    PRIVATE
+        clamp
+)
+
+add_test(NAME clamp_aggregator_test COMMAND clamp_aggregator_test)
