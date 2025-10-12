@@ -1,0 +1,50 @@
+name: Clamp Validation
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-22.04
+    container:
+      image: rocm/dev-ubuntu-22.04:6.4.4
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up ROCm environment
+        run: |
+          echo "ROCM_PATH=/opt/rocm" >> $GITHUB_ENV
+          echo "HIP_DIR=/opt/rocm/lib/cmake/hip" >> $GITHUB_ENV
+          echo "rocblas_DIR=/opt/rocm/rocblas/lib/cmake/rocblas" >> $GITHUB_ENV
+          export PATH=/opt/rocm/bin:$PATH
+
+      - name: Configure with CMake
+        run: |
+          cmake -B build -G Ninja \
+            -DHIP_DIR=$HIP_DIR \
+            -Drocblas_DIR=$rocblas_DIR \
+            -DCMAKE_PREFIX_PATH="/opt/rocm"
+
+      - name: Build Clamp
+        run: cmake --build build --config Release
+
+      - name: Run CTest validation
+        working-directory: build
+        run: |
+          ctest --output-on-failure
+
+      - name: Export telemetry (optional)
+        if: success()
+        run: |
+          if [ -d build/telemetry ]; then
+            jq '.stability_score' build/telemetry/*.json || true
+          else
+            echo "No telemetry data exported."
+          fi
