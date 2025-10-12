@@ -1,0 +1,15 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Clamp Validation",
+      "type": "shell",
+      "command": "cd ${workspaceFolder} && ctest --output-on-failure && [ -d telemetry ] && cat telemetry/*.json | jq '.stability_score' || true",
+      "problemMatcher": [],
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      }
+    }
+  ]
+}

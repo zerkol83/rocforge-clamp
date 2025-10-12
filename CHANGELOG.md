@@ -1,3 +1,38 @@
+Clamp v0.4.0 — Distributed Temporal Scoring & Telemetry Aggregation
+==================================================================
+
+Release date: 2025-??-??  
+Status: Pending validation under Debian 13 + ROCm 6.4.4  
+Tag: v0.4.0
+
+Summary
+-------
+
+Clamp v0.4 evolves the subsystem into a distributed stability evaluator. Temporal scoring converts anchor telemetry into quantitative reproducibility metrics, while enhanced aggregation APIs capture multi-node entropy behaviour and persist JSON logs for downstream ROCForge analytics.
+
+Key Enhancements
+----------------
+
+- TemporalScoring module computes stability scores, variance metrics, and drift analysis with JSON and plain-text reporting.
+- EntropyTelemetry gains distributed aggregation, timestamp alignment, and filesystem archival capabilities.
+- Expanded CTest coverage validates scoring, multi-thread entropy reproducibility, and HIP mirroring across aggregated datasets.
+- GitHub Actions workflow now runs matrix builds with parallel test execution and publishes telemetry artifacts.
+
+Validation Artifacts
+--------------------
+
+```
+ctest --output-on-failure
+cat build/telemetry/*.json | jq '.stability_score'
+```
+
+Outlook for v0.5
+----------------
+
+- Streaming telemetry ingestion for ROCForge’s global dashboards.
+- GPU-resident scoring kernels for on-device reproducibility estimates.
+- Automated anomaly detection over archived entropy traces.
+
 Clamp v0.2.0 — Entropy Stabilization and Deterministic RAII Validation
 ======================================================================
 

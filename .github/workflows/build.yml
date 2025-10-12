@@ -8,6 +8,9 @@ on:
 jobs:
   rocm-build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        config: [default, parallel]
     container:
       image: ghcr.io/rocm/dev:6.4.4-ubuntu-22.04
     steps:
@@ -38,4 +41,16 @@ jobs:
       - name: Run Tests
         run: |
           export PATH=/opt/rocm/bin:$PATH
-          ctest --test-dir build --output-on-failure
+          if [ "${{ matrix.config }}" = "parallel" ]; then
+            ctest --test-dir build --output-on-failure -j 4
+          else
+            ctest --test-dir build --output-on-failure
+          fi
+
+      - name: Archive Telemetry
+        if: matrix.config == 'parallel'
+        uses: actions/upload-artifact@v4
+        with:
+          name: clamp-telemetry-${{ matrix.config }}
+          path: build/telemetry
+          if-no-files-found: warn

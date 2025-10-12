@@ -4,7 +4,7 @@ Clamp is a foundational subsystem in the ROCForge toolchain designed to provide 
 
 Where ROCForge orchestrates large-scale GPU/CPU workloads, Clamp acts as its stabilizer — detecting, isolating, and controlling volatile runtime states that arise from entropy-driven scheduling, thread divergence, or inconsistent memory visibility across the ROCm stack.
 
-Clamp exposes a simple C++20 API (ClampAnchor) that lets higher-level modules “lock” execution environments, synchronize memory anchors, and safely “release” them once integrity checks pass. ClampAnchor relies on RAII semantics so anchors lock during construction and release automatically on scope exit. Each anchor tracks a lightweight entropy seed derived from clock and thread identifiers, making HIP kernel seeding deterministic while preparing for ROCForge’s future global entropy model. The v0.3 line extends this foundation with an EntropyTelemetry subsystem that captures per-anchor seeds, timestamps, thread identifiers, and lock durations with JSON export for downstream analytics. A stabilization protocol records anchor state transitions (Unlocked → Locked → Released/Error) with timestamped diagnostics and HIP mirroring routines to guard against double-locks or premature releases while validating device-side consistency.
+Clamp exposes a simple C++20 API (ClampAnchor) that lets higher-level modules “lock” execution environments, synchronize memory anchors, and safely “release” them once integrity checks pass. ClampAnchor relies on RAII semantics so anchors lock during construction and release automatically on scope exit. Each anchor tracks a lightweight entropy seed derived from clock and thread identifiers, making HIP kernel seeding deterministic while preparing for ROCForge’s future global entropy model. The v0.4 line extends this foundation with an EntropyTelemetry subsystem that captures per-anchor seeds, timestamps, thread identifiers, and lock durations, plus a TemporalScoring evaluator that quantifies reproducibility scores across sequential and distributed runs. A stabilization protocol records anchor state transitions (Unlocked → Locked → Released/Error) with timestamped diagnostics and HIP mirroring routines to guard against double-locks or premature releases while validating device-side consistency.
 
 The project’s immediate goals are:
 
@@ -29,7 +29,8 @@ The default build links against HIP and rocBLAS, enabling the optional HIP entro
 
 ## Telemetry & Metrics
 - `EntropyTelemetry` records per-anchor seeds, acquisition/release timestamps, thread identifiers, and lock durations.
-- JSON snapshots provide machine-readable feeds for ROCForge telemetry ingestion.
+- JSON snapshots provide machine-readable feeds for ROCForge telemetry ingestion and can be serialised to `/tmp/clamp_telemetry` or a user-specified path.
 - HIP mirroring validates that entropy seeds and state flags observed on the host are consistent on AMD GPUs.
+- `TemporalScoring` consumes telemetry snapshots to produce normalized reproducibility scores (0.0–1.0), entropy variance, duration variance, and drift measurements. Results can be exported as JSON or human-readable summaries for dashboards and CI artifacts.
 
-See `docs/technical_overview.md` for an in-depth discussion of the entropy lifecycle, ROCm dependency graph, and stability metrics captured during the v0.3 validation campaign.
+See `docs/technical_overview.md` for an in-depth discussion of the entropy lifecycle, temporal alignment algorithms, ROCm dependency graph, and stability metrics captured during the v0.4 validation campaign.

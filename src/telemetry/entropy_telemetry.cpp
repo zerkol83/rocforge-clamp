@@ -2,6 +2,8 @@
 
 #include <ctime>
 #include <iomanip>
+#include <filesystem>
+#include <fstream>
 #include <sstream>
 
 namespace clamp {
@@ -116,6 +118,69 @@ std::vector<AnchorTelemetryRecord> EntropyTelemetry::records() const {
     return records_;
 }
 
+void EntropyTelemetry::merge(const EntropyTelemetry& other) {
+    mergeRecords(other.records());
+}
+
+void EntropyTelemetry::mergeRecords(const std::vector<AnchorTelemetryRecord>& externalRecords) {
+    if (externalRecords.empty()) {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(mutex_);
+    records_.insert(records_.end(), externalRecords.begin(), externalRecords.end());
+}
+
+void EntropyTelemetry::alignToReference(const std::chrono::system_clock::time_point& reference) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (records_.empty()) {
+        return;
+    }
+
+    std::optional<std::chrono::system_clock::time_point> minTime;
+    for (const auto& record : records_) {
+        if (record.acquiredAt.time_since_epoch().count() == 0) {
+            continue;
+        }
+        if (!minTime || record.acquiredAt < *minTime) {
+            minTime = record.acquiredAt;
+        }
+    }
+
+    if (!minTime) {
+        return;
+    }
+
+    const auto delta = reference - *minTime;
+    for (auto& record : records_) {
+        if (record.acquiredAt.time_since_epoch().count() != 0) {
+            record.acquiredAt += delta;
+        }
+        if (record.releasedAt) {
+            record.releasedAt = *record.releasedAt + delta;
+        }
+    }
+}
+
+bool EntropyTelemetry::writeJson(const std::filesystem::path& directory,
+                                 const std::string& filenameHint) const {
+    const std::string payload = toJson();
+    std::error_code ec;
+    std::filesystem::create_directories(directory, ec);
+    if (ec) {
+        return false;
+    }
+
+    const auto filename = makeFilename(filenameHint);
+    const auto fullPath = directory / filename;
+    std::ofstream out(fullPath);
+    if (!out) {
+        return false;
+    }
+    out << payload;
+    return out.good();
+}
+
 std::string EntropyTelemetry::formatTime(const std::chrono::system_clock::time_point& tp) {
     if (tp.time_since_epoch().count() == 0) {
         return "";
@@ -136,6 +201,23 @@ std::string EntropyTelemetry::formatTime(const std::chrono::system_clock::time_p
 std::string EntropyTelemetry::threadIdToString(const std::thread::id& threadId) {
     std::ostringstream oss;
     oss << threadId;
+    return oss.str();
+}
+
+std::string EntropyTelemetry::makeFilename(const std::string& hint) {
+    const auto now = std::chrono::system_clock::now();
+    const std::time_t rawTime = std::chrono::system_clock::to_time_t(now);
+    std::tm result{};
+#if defined(_WIN32)
+    gmtime_s(&result, &rawTime);
+#else
+    gmtime_r(&rawTime, &result);
+#endif
+
+    std::ostringstream oss;
+    oss << hint << '_'
+        << std::put_time(&result, "%Y%m%dT%H%M%SZ")
+        << ".json";
     return oss.str();
 }
 

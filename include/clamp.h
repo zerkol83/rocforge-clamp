@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <filesystem>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -44,10 +45,16 @@ public:
     void recordRelease(std::size_t recordId, const AnchorStatus& status, const std::string& ctx);
     std::string toJson() const;
     std::vector<AnchorTelemetryRecord> records() const;
+    void merge(const EntropyTelemetry& other);
+    void mergeRecords(const std::vector<AnchorTelemetryRecord>& externalRecords);
+    void alignToReference(const std::chrono::system_clock::time_point& reference);
+    bool writeJson(const std::filesystem::path& directory = "/tmp/clamp_telemetry",
+                   const std::string& filenameHint = "telemetry") const;
 
 private:
     static std::string formatTime(const std::chrono::system_clock::time_point& tp);
     static std::string threadIdToString(const std::thread::id& threadId);
+    static std::string makeFilename(const std::string& hint);
 
     mutable std::mutex mutex_;
     std::vector<AnchorTelemetryRecord> records_;
