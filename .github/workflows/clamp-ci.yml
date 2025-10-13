@@ -6,13 +6,32 @@ on:
   pull_request:
 
 jobs:
+  resolve-image:
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.resolve.outputs.image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install resolver dependencies
+        run: |
+          python3 -m pip install --user PyYAML
+
+      - name: Resolve ROCm container
+        id: resolve
+        run: |
+          image=$(python3 ci/resolve_rocm.py)
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+
   rocm-build:
+    needs: resolve-image
     runs-on: ubuntu-latest
     strategy:
       matrix:
         config: [default, parallel]
     container:
-      image: ghcr.io/rocm/dev:6.4.4-ubuntu-22.04
+      image: ${{ needs.resolve-image.outputs.image }}
 
     steps:
       - name: Checkout
@@ -22,7 +41,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /opt/rocm
-          key: rocm-${{ runner.os }}-6.4.4
+          key: rocm-${{ runner.os }}-${{ hashFiles('ci/rocm_matrix.yml') }}
 
       - name: Install build dependencies
         run: |

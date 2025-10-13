@@ -1,0 +1,54 @@
+name: Update ROCm Matrix
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install PyYAML requests
+
+      - name: Update ROCm matrix
+        id: update
+        run: |
+          python ci/update_rocm_matrix.py --os ubuntu-22.04 | tee update.log
+          if git diff --quiet ci/rocm_matrix.yml; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Summarize update
+        if: steps.update.outputs.changed == 'true'
+        run: |
+          echo "Latest ROCm matrix changes:" && cat update.log
+
+      - name: Create pull request
+        if: steps.update.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          commit-message: "Auto-update ROCm matrix"
+          title: "Auto-update ROCm matrix"
+          body: |
+            Automated ROCm matrix refresh triggered by scheduled workflow.
+
+            See workflow artifacts for the discovery log.
+          branch: chore/auto-update-rocm
+          delete-branch: true
