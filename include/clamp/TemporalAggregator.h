@@ -18,6 +18,11 @@ public:
         double driftIndex{0.0};
         std::string backend;
         std::string deviceName;
+        std::string trustStatus{"unknown"};
+        std::string provenanceIssuer{"unknown"};
+        std::string provenanceTimestamp;
+        std::string digestAlgorithm{"sha256"};
+        std::string policyDecision;
     };
 
     struct SessionDetail {

@@ -63,6 +63,63 @@ std::string escapeJson(const std::string& value) {
     return oss.str();
 }
 
+std::string extractJsonString(const std::string& text, const std::string& key) {
+    const std::string quotedKey = "\"" + key + "\"";
+    auto keyPos = text.find(quotedKey);
+    if (keyPos == std::string::npos) {
+        return {};
+    }
+    auto colon = text.find(':', keyPos + quotedKey.size());
+    if (colon == std::string::npos) {
+        return {};
+    }
+    auto firstQuote = text.find('"', colon + 1);
+    if (firstQuote == std::string::npos) {
+        return {};
+    }
+    auto secondQuote = text.find('"', firstQuote + 1);
+    while (secondQuote != std::string::npos && text[secondQuote - 1] == '\\') {
+        secondQuote = text.find('"', secondQuote + 1);
+    }
+    if (secondQuote == std::string::npos) {
+        return {};
+    }
+    return text.substr(firstQuote + 1, secondQuote - firstQuote - 1);
+}
+
+void applyProvenanceMetadata(TemporalAggregator::Summary& summary, const std::filesystem::path& path) {
+    std::ifstream in(path);
+    if (!in.is_open()) {
+        return;
+    }
+    std::string contents((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    if (contents.empty()) {
+        return;
+    }
+
+    const auto issuer = extractJsonString(contents, "issuer");
+    const auto timestamp = extractJsonString(contents, "timestamp");
+    const auto digestAlg = extractJsonString(contents, "digestAlgorithm");
+    const auto policyDecision = extractJsonString(contents, "policyDecision");
+    const auto trustStatus = extractJsonString(contents, "trustStatus");
+
+    if (!issuer.empty()) {
+        summary.provenanceIssuer = issuer;
+    }
+    if (!timestamp.empty()) {
+        summary.provenanceTimestamp = timestamp;
+    }
+    if (!digestAlg.empty()) {
+        summary.digestAlgorithm = digestAlg;
+    }
+    if (!policyDecision.empty()) {
+        summary.policyDecision = policyDecision;
+    }
+    if (!trustStatus.empty()) {
+        summary.trustStatus = trustStatus;
+    }
+}
+
 struct ParsedRecord {
     double stabilityScore{0.0};
     double durationMs{0.0};
@@ -386,7 +443,12 @@ std::string summaryToJson(const TemporalAggregator::Summary& summary,
     oss << "\"session_count\":" << summary.sessionCount << ",";
     oss << "\"mean_stability\":" << summary.meanStability << ",";
     oss << "\"stability_variance\":" << summary.stabilityVariance << ",";
-    oss << "\"drift_index\":" << summary.driftIndex;
+    oss << "\"drift_index\":" << summary.driftIndex << ",";
+    oss << "\"trustStatus\":\"" << escapeJson(summary.trustStatus) << "\",";
+    oss << "\"provenanceIssuer\":\"" << escapeJson(summary.provenanceIssuer) << "\",";
+    oss << "\"provenanceTimestamp\":\"" << escapeJson(summary.provenanceTimestamp) << "\",";
+    oss << "\"digestAlgorithm\":\"" << escapeJson(summary.digestAlgorithm) << "\",";
+    oss << "\"policyDecision\":\"" << escapeJson(summary.policyDecision) << "\"";
     oss << "}";
     return oss.str();
 }
@@ -492,6 +554,11 @@ TemporalAggregator::Summary TemporalAggregator::aggregate(const std::filesystem:
 TemporalAggregator::Summary TemporalAggregator::accumulate(const std::filesystem::path& workspaceRoot) {
     const auto telemetryDir = workspaceRoot / "build" / "telemetry";
     Summary summary = aggregate(telemetryDir);
+    const auto provenancePath = workspaceRoot / "build" / "rocm_provenance.json";
+    applyProvenanceMetadata(summary, provenancePath);
+    if (summary.policyDecision.empty()) {
+        summary.policyDecision = "mode=unknown";
+    }
     const auto summaryPath = workspaceRoot / "build" / "telemetry_summary.json";
     writeSummary(summary, summaryPath, telemetryDir.string());
     return summary;
@@ -547,6 +614,11 @@ TemporalAggregator::Summary TemporalAggregator::loadSummary(const std::filesyste
     if (summary.deviceName.empty()) {
         readString("\"device_name\"", summary.deviceName);
     }
+    readString("\"trustStatus\"", summary.trustStatus);
+    readString("\"provenanceIssuer\"", summary.provenanceIssuer);
+    readString("\"provenanceTimestamp\"", summary.provenanceTimestamp);
+    readString("\"digestAlgorithm\"", summary.digestAlgorithm);
+    readString("\"policyDecision\"", summary.policyDecision);
     readValue("\"meanStability\"", summary.meanStability);
     if (summary.meanStability == 0.0) {
         readValue("\"mean_stability\"", summary.meanStability);

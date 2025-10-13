@@ -3,3 +3,5 @@ policy:
   digest_ttl: 7          # days before a digest is considered stale
   workflow: update-rocm.yml
   auto_update_ref: main
+  require_signature: false
+  attest_mode: none       # none | record | enforce

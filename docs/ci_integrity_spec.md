@@ -7,7 +7,7 @@ This document describes how Clamp validates and maintains the ROCm container mat
 | Component | Purpose |
 |-----------|---------|
 | `ci/rocm_matrix.yml` | Canonical catalog of ROCm container images (version, OS, digest, discovery date). |
-| `ci/rocm_policy.yml` | Enforcement policy (strict / warn / auto_update) and digest lifetime (TTL). |
+| `ci/rocm_policy.yml` | Enforcement policy (strict / warn / auto_update), digest TTL, signature requirements (`require_signature`), and attestation handling (`attest_mode`). |
 | `ci/resolve_rocm.py` | Selects the preferred container according to policy ordering and emits a digest-qualified reference. |
 | `ci/verify_rocm_digest.py` | Validates the selected image’s digest against GHCR and the recorded matrix value. |
 | `ci/update_rocm_matrix.py` | Discovers new ROCm tags and records their digests for review. |
@@ -61,6 +61,25 @@ Exit codes: `0 = OK`, `1 = warning`, `2 = failure`. The CI step wraps the script
 ```
 
 When `on_mismatch: auto_update` (policy mode `auto_update`) is active, any digest drift automatically dispatches `.github/workflows/update-rocm.yml` using the CI token. The workflow creates or updates the “Auto-update ROCm matrix” PR with refreshed digests, closing the loop without manual intervention. Strict/warn modes behave as before.
+
+### Sample `rocm_provenance.json`
+
+```json
+{
+  "image": "ghcr.io/rocm/dev:6.4.4-ubuntu-22.04@sha256:79aa4398…",
+  "policyMode": "strict",
+  "requireSignature": true,
+  "attestMode": "record",
+  "provenance": {
+    "status": "verified",
+    "issuer": "sigstore",
+    "timestamp": "2025-01-01T00:00:00Z",
+    "digestAlgorithm": "sha256",
+    "policyDecision": "mode=strict|require_sig=true|attest=record|status=0",
+    "trustStatus": "valid"
+  }
+}
+```
 
 ## Workflow Interaction
 

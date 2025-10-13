@@ -1,4 +1,6 @@
 Backend: unknown  Device: unspecified
+Trust: unknown  Issuer: unknown
+Verified:   Digest Alg: sha256
 +----------------+-------------+
 | Metric         | Value       |
 +----------------+-------------+

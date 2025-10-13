@@ -17,6 +17,7 @@ endif()
 find_package(HIP REQUIRED)
 enable_language(HIP)
 find_package(rocblas REQUIRED)
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
 
 add_library(clamp STATIC
     src/clamp.cpp
@@ -117,6 +118,11 @@ target_link_libraries(clamp_compare_test
 )
 
 add_test(NAME clamp_compare_test COMMAND clamp_compare_test)
+
+add_test(NAME clamp_phase4_end2end
+    COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tests/test_phase4_end2end.py
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
 
 add_executable(telemetry_inspect
     src/tools/telemetry_inspect.cpp

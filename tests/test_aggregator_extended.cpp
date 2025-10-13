@@ -56,6 +56,18 @@ int main() {
     writeTelemetryFile(telemetryDir / "session_b.json", {{0.9, 50.0}});
     writeMalformedTelemetry(telemetryDir / "session_bad.json");
     std::ofstream(telemetryDir / "readme.txt") << "not json";
+    std::ofstream(buildDir / "rocm_provenance.json")
+        << "{\n  \"image\": \"ghcr.io/rocm/dev:6.4.4-ubuntu-22.04@sha256:deadbeef\",\n"
+           "  \"policyMode\": \"strict\",\n"
+           "  \"provenance\": {\n"
+           "    \"status\": \"verified\",\n"
+           "    \"issuer\": \"sigstore\",\n"
+           "    \"timestamp\": \"2025-01-01T00:00:00Z\",\n"
+           "    \"digestAlgorithm\": \"sha256\",\n"
+           "    \"policyDecision\": \"mode=strict|require_sig=false|attest=none|status=0\",\n"
+           "    \"trustStatus\": \"valid\"\n"
+           "  }\n"
+           "}\n";
 
     clamp::TemporalAggregator aggregator;
     const auto summary = aggregator.accumulate(workspace);
@@ -69,6 +81,8 @@ int main() {
     assert(summary.driftIndex == summary.driftPercentile);
     assert(summary.backend == "unknown");
     assert(summary.deviceName == "unspecified");
+    assert(summary.trustStatus == "valid");
+    assert(summary.provenanceIssuer == "sigstore");
 
     assert(std::filesystem::exists(summaryPath));
     const auto firstSnapshot = slurpFile(summaryPath);
@@ -77,6 +91,7 @@ int main() {
     assert(firstSnapshot.find("\"sessionCount\"") != std::string::npos);
     assert(firstSnapshot.find("\"mean_stability\"") != std::string::npos);
     assert(firstSnapshot.find("\"backend\"") != std::string::npos);
+    assert(firstSnapshot.find("\"trustStatus\"") != std::string::npos);
 
     const auto repeated = aggregator.accumulate(workspace);
     const auto secondSnapshot = slurpFile(summaryPath);

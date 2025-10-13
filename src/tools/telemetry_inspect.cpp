@@ -166,6 +166,13 @@ void printComparison(const TelemetryComparator::Result& result) {
 void printSummary(const TemporalAggregator::Summary& summary) {
     std::cout << "Backend: " << summary.backend
               << "  Device: " << summary.deviceName << "\n";
+    std::cout << "Trust: " << summary.trustStatus
+              << "  Issuer: " << summary.provenanceIssuer << "\n";
+    std::cout << "Verified: " << summary.provenanceTimestamp
+              << "  Digest Alg: " << summary.digestAlgorithm << "\n";
+    if (!summary.policyDecision.empty()) {
+        std::cout << "Policy Decision: " << summary.policyDecision << "\n";
+    }
     std::cout << "+----------------+-------------+\n";
     std::cout << "| Metric         | Value       |\n";
     std::cout << "+----------------+-------------+\n";

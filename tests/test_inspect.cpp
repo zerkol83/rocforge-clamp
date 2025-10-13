@@ -63,15 +63,32 @@ int main() {
                    "  ]\n"
                    "}\n");
     writeTelemetry(telemetryDir / "notes.txt", "not json");
+    writeTelemetry(buildDir / "rocm_provenance.json",
+                   "{\n"
+                   "  \"image\": \"ghcr.io/rocm/dev:6.4.4-ubuntu-22.04@sha256:deadbeef\",\n"
+                   "  \"policyMode\": \"strict\",\n"
+                   "  \"provenance\": {\n"
+                   "    \"status\": \"verified\",\n"
+                   "    \"issuer\": \"sigstore\",\n"
+                   "    \"timestamp\": \"2025-01-01T00:00:00Z\",\n"
+                   "    \"digestAlgorithm\": \"sha256\",\n"
+                   "    \"policyDecision\": \"mode=strict|require_sig=false|attest=none|status=0\",\n"
+                   "    \"trustStatus\": \"valid\"\n"
+                   "  }\n"
+                   "}\n");
 
     clamp::TemporalAggregator aggregator;
     const auto summary = aggregator.accumulate(root);
     assert(summary.sessionCount == 3);
     assert(std::abs(summary.meanStability - 0.8) < 1e-9);
+    assert(summary.trustStatus == "valid");
+    assert(summary.provenanceIssuer == "sigstore");
+    assert(summary.digestAlgorithm == "sha256");
 
     ensureCommand("./telemetry_inspect --summary > build/inspect_summary.txt");
     const auto summaryOutput = readFile(summaryDump);
     assert(summaryOutput.find("Backend: unknown  Device: unspecified") != std::string::npos);
+    assert(summaryOutput.find("Trust: valid") != std::string::npos);
     assert(summaryOutput.find("0.8000") != std::string::npos);
     assert(summaryOutput.find("0.0400") != std::string::npos);
     assert(summaryOutput.find("20.0000") != std::string::npos);

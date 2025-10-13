@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import json
 import os
+import subprocess
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
@@ -26,6 +28,7 @@ class VerificationStatus:
     OK = 0
     WARN = 1
     FAIL = 2
+    SIGNATURE_FAIL = 3
 
 
 @dataclass
@@ -34,6 +37,8 @@ class Policy:
     digest_ttl: int = 7
     workflow: str = "update-rocm.yml"
     auto_update_ref: str = "main"
+    require_signature: bool = False
+    attest_mode: str = "none"
 
     @classmethod
     def load(cls, path: Path) -> "Policy":
@@ -47,6 +52,8 @@ class Policy:
             digest_ttl=int(policy.get("digest_ttl", cls.digest_ttl)),
             workflow=str(policy.get("workflow", cls.workflow)).strip() or cls.workflow,
             auto_update_ref=str(policy.get("auto_update_ref", cls.auto_update_ref)).strip() or cls.auto_update_ref,
+            require_signature=bool(policy.get("require_signature", cls.require_signature)),
+            attest_mode=str(policy.get("attest_mode", cls.attest_mode)).strip() or cls.attest_mode,
         )
 
     @property
@@ -68,6 +75,7 @@ class ImageRecord:
     os_name: str
     digest: str
     added: Optional[str]
+    provenance: Dict[str, str] = field(default_factory=dict)
 
     @property
     def key(self) -> Tuple[str, str]:
@@ -84,6 +92,7 @@ class ImageRecord:
             os_name=str(entry.get("os", "")).strip(),
             digest=str(entry.get("digest", "")).strip(),
             added=entry.get("added"),
+            provenance=entry.get("provenance", {}) or {},
         )
 
 
@@ -113,6 +122,8 @@ def load_matrix(path: Path) -> Dict[Tuple[str, str], ImageRecord]:
 
 
 def fetch_remote_digest(tag: str) -> Optional[str]:
+    if const := os.getenv("CLAMP_SKIP_REMOTE_DIGEST"):
+        return const.strip() or None
     url = f"https://ghcr.io/v2/rocm/dev/manifests/{tag}"
     response = requests.head(url, headers=HEADERS, timeout=30)
     if response.status_code == 404:
@@ -168,6 +179,69 @@ def classify_status(status: int, policy: Policy, reason: str) -> int:
     return VerificationStatus.WARN
 
 
+def current_timestamp() -> str:
+    return dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def run_cosign_verify(image_ref: str, key_path: Optional[str], identity: Optional[str], issuer: Optional[str]) -> Dict:
+    cmd = ["cosign", "verify", "--output", "json"]
+    if key_path:
+        cmd.extend(["--key", key_path])
+    else:
+        if identity:
+            cmd.extend(["--certificate-identity-regexp", identity])
+        if issuer:
+            cmd.extend(["--certificate-oidc-issuer", issuer])
+    cmd.append(image_ref)
+
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    except FileNotFoundError as exc:
+        raise RuntimeError("cosign CLI not found in PATH") from exc
+
+    if proc.returncode != 0:
+        raise RuntimeError(proc.stderr.strip() or proc.stdout.strip() or "cosign verify failed")
+
+    try:
+        payload = json.loads(proc.stdout or "[]")
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"Unable to parse cosign output: {exc}") from exc
+
+    if not isinstance(payload, list) or not payload:
+        raise RuntimeError("cosign returned an empty verification payload")
+
+    entry = payload[0]
+    identity_info = entry.get("critical", {}).get("identity", {})
+    return {
+        "raw": payload,
+        "subject": identity_info.get("docker-reference"),
+        "issuer": identity_info.get("issuer"),
+        "timestamp": identity_info.get("signedTimestamp"),
+        "logIndex": entry.get("logIndex"),
+    }
+
+
+def write_provenance_output(image_ref: str, policy: Policy, provenance: Dict[str, object]) -> None:
+    path = os.getenv("PROVENANCE_OUTPUT")
+    if not path:
+        return
+    try:
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(
+                {
+                    "image": image_ref,
+                    "policyMode": policy.mode,
+                    "requireSignature": policy.require_signature,
+                    "attestMode": policy.attest_mode,
+                    "provenance": provenance,
+                },
+                handle,
+                indent=2,
+            )
+    except OSError as exc:
+        print(f"Failed to write provenance output: {exc}", file=sys.stderr)
+
+
 def verify(image_ref: str, matrix_path: Path, policy_path: Path) -> int:
     policy = Policy.load(policy_path)
     records = load_matrix(matrix_path)
@@ -186,6 +260,7 @@ def verify(image_ref: str, matrix_path: Path, policy_path: Path) -> int:
         return VerificationStatus.FAIL if policy.is_strict else VerificationStatus.WARN
 
     expected_digest = record.digest
+    digest_algorithm = expected_digest.split(":", 1)[0] if ":" in expected_digest else "unknown"
     if not expected_digest or not expected_digest.startswith("sha256:"):
         print(f"Matrix digest missing for {tag}", file=sys.stderr)
         return VerificationStatus.FAIL if policy.is_strict else VerificationStatus.WARN
@@ -205,13 +280,106 @@ def verify(image_ref: str, matrix_path: Path, policy_path: Path) -> int:
         print(f"Digest drift detected for {tag}: matrix={expected_digest}, remote={remote_digest}", file=sys.stderr)
         status = VerificationStatus.FAIL
 
+    ttl_expired = False
     added_date = parse_added_date(record)
     if added_date is not None:
         age_days = (dt.date.today() - added_date).days
         if age_days > policy.digest_ttl:
             print(f"Digest for {tag} is {age_days} days old (TTL={policy.digest_ttl}).", file=sys.stderr)
             status = max(status, VerificationStatus.WARN)
-    return classify_status(status, policy, reason=f"Digest drift for {tag}")
+            ttl_expired = True
+
+    provenance_summary: Dict[str, Optional[str]]
+    signature_required = policy.require_signature or policy.attest_mode.lower() in {"record", "enforce"}
+
+    if signature_required:
+        key_path = record.provenance.get("key_path") if record.provenance else None
+        identity = record.provenance.get("identity") if record.provenance else None
+        issuer = record.provenance.get("issuer") if record.provenance else None
+        image_for_signing = image_ref if "@" in image_ref else f"{repo}:{tag}@{expected_digest}"
+
+        try:
+            cosign_result = run_cosign_verify(image_for_signing, key_path, identity, issuer)
+            provenance_summary = {
+                "status": "verified",
+                "subject": cosign_result.get("subject"),
+                "issuer": cosign_result.get("issuer"),
+                "logIndex": cosign_result.get("logIndex"),
+                "timestamp": cosign_result.get("timestamp"),
+            }
+            print(f"[PROVENANCE] Verified signature for {tag} (issuer={provenance_summary['issuer']}).")
+        except RuntimeError as exc:
+            print(f"Signature verification failed for {tag}: {exc}", file=sys.stderr)
+            if policy.require_signature:
+                write_provenance_output(
+                    image_for_signing,
+                    policy,
+                    {
+                        "status": "failed",
+                        "error": str(exc),
+                        "timestamp": current_timestamp(),
+                        "digestAlgorithm": digest_algorithm,
+                        "policyDecision": f"mode={policy.mode}|require_sig={policy.require_signature}|attest={policy.attest_mode}|status={VerificationStatus.SIGNATURE_FAIL}",
+                        "trustStatus": "invalid",
+                    },
+                )
+                return VerificationStatus.SIGNATURE_FAIL
+            if policy.attest_mode.lower() == "enforce":
+                write_provenance_output(
+                    image_for_signing,
+                    policy,
+                    {
+                        "status": "failed",
+                        "error": str(exc),
+                        "timestamp": current_timestamp(),
+                        "digestAlgorithm": digest_algorithm,
+                        "policyDecision": f"mode={policy.mode}|require_sig={policy.require_signature}|attest={policy.attest_mode}|status={VerificationStatus.SIGNATURE_FAIL}",
+                        "trustStatus": "invalid",
+                    },
+                )
+                return VerificationStatus.SIGNATURE_FAIL
+            status = max(status, VerificationStatus.WARN)
+            provenance_summary = {
+                "status": "unverified",
+                "error": str(exc),
+            }
+        else:
+            if policy.attest_mode.lower() == "enforce" and provenance_summary["status"] != "verified":
+                write_provenance_output(image_for_signing, policy, provenance_summary)
+                return VerificationStatus.SIGNATURE_FAIL
+    else:
+        provenance_summary = {
+            "status": "skipped",
+            "reason": "signature_not_required",
+        }
+        image_for_signing = image_ref if "@" in image_ref else f"{repo}:{tag}@{expected_digest}"
+
+    final_status = classify_status(status, policy, reason=f"Digest drift for {tag}")
+
+    provenance_summary.setdefault("timestamp", current_timestamp())
+    provenance_summary["digestAlgorithm"] = digest_algorithm
+    provenance_summary["policyDecision"] = (
+        f"mode={policy.mode}|require_sig={policy.require_signature}|attest={policy.attest_mode}|status={final_status}"
+    )
+
+    if ttl_expired:
+        trust_status = "expired"
+    elif final_status == VerificationStatus.SIGNATURE_FAIL:
+        trust_status = "invalid"
+    elif provenance_summary.get("status") == "verified":
+        trust_status = "valid"
+    elif provenance_summary.get("status") == "unverified":
+        trust_status = "invalid"
+    elif provenance_summary.get("status") == "skipped":
+        trust_status = "unsigned"
+    else:
+        trust_status = "unknown"
+
+    provenance_summary["trustStatus"] = trust_status
+
+    write_provenance_output(image_for_signing, policy, provenance_summary)
+
+    return final_status
 
 
 def main() -> int:
