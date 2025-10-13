@@ -10,19 +10,40 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       image: ${{ steps.resolve.outputs.image }}
+      digest_status: ${{ steps.verify.outputs.status }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Install resolver dependencies
         run: |
-          python3 -m pip install --user PyYAML
+          python3 -m pip install --user PyYAML requests
 
       - name: Resolve ROCm container
         id: resolve
         run: |
           image=$(python3 ci/resolve_rocm.py)
           echo "image=$image" >> "$GITHUB_OUTPUT"
+
+      - name: Verify ROCm digest
+        id: verify
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          status="ok"
+          python3 ci/verify_rocm_digest.py "${{ steps.resolve.outputs.image }}"
+          rc=$?
+          if [ $rc -eq 1 ]; then
+            echo "::warning::ROCm digest drift detected (policy warn)."
+            status="warn"
+          elif [ $rc -eq 2 ]; then
+            echo "status=fail" >> "$GITHUB_OUTPUT"
+            echo "ROCm digest verification failed." >&2
+            status="fail"
+            exit 1
+          fi
+          echo "status=$status" >> "$GITHUB_OUTPUT"
 
   rocm-build:
     needs: resolve-image

@@ -11,6 +11,7 @@ Highlights
 - Comparative profiling (Phase 4) – Telemetry instrumentation now tags every record and summary with backend/device metadata, enabling cross-target analysis.
 - Added `telemetry_inspect --compare` for side-by-side stability/drift/variance reporting with parity arrows and drift significance markers, writing `telemetry_comparison.json` for downstream dashboards.
 - Introduced `TelemetryComparator` core utility and regression tests covering mean deltas, drift skew, and variance ratios across CPU vs HIP summaries.
+- ROCm container integrity checks now enforce digest verification via `ci/verify_rocm_digest.py`, honoring `ci/rocm_policy.yml` (strict/warn/auto-update) and documenting the flow in `docs/ci_integrity_spec.md`.
 
 Clamp v0.6.0-dev — Diagnostics & Visualization Bridge
 =====================================================

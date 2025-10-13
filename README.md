@@ -46,4 +46,4 @@ ctest --output-on-failure --test-dir build
 ```
 Adjust `/opt/rocm` if ROCm is installed elsewhere.
 
-See `docs/technical_overview.md` for an in-depth discussion of the entropy lifecycle, temporal alignment algorithms, ROCm dependency graph, and stability metrics captured during the v0.4 validation campaign. The telemetry schema and reproducibility guarantees are defined in `docs/telemetry_spec.md`.
+See `docs/technical_overview.md` for an in-depth discussion of the entropy lifecycle, temporal alignment algorithms, ROCm dependency graph, and stability metrics captured during the v0.4 validation campaign. The telemetry schema and reproducibility guarantees are defined in `docs/telemetry_spec.md`. The container resolver, digest verification pipeline, and update workflows are documented in `docs/ci_integrity_spec.md`.
