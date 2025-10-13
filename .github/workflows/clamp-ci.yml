@@ -1,0 +1,78 @@
+name: Clamp CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+
+jobs:
+  rocm-build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        config: [default, parallel]
+    container:
+      image: ghcr.io/rocm/dev:6.4.4-ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache ROCm toolchain
+        uses: actions/cache@v4
+        with:
+          path: /opt/rocm
+          key: rocm-${{ runner.os }}-6.4.4
+
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          apt-get install -y cmake ninja-build g++ python3 jq
+
+      - name: Configure
+        run: |
+          export PATH=/opt/rocm/bin:$PATH
+          cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=/opt/rocm
+
+      - name: Build
+        run: |
+          export PATH=/opt/rocm/bin:$PATH
+          cmake --build build
+
+      - name: Test
+        run: |
+          export PATH=/opt/rocm/bin:$PATH
+          if [ "${{ matrix.config }}" = "parallel" ]; then
+            ctest --test-dir build --output-on-failure -j 4
+          else
+            ctest --test-dir build --output-on-failure
+          fi
+
+      - name: Configure Clamp
+        run: |
+          export PATH=/opt/rocm/bin:$PATH
+          cmake -S clamp -B build -G Ninja -DCMAKE_PREFIX_PATH=/opt/rocm
+
+      - name: Build Clamp
+        run: |
+          export PATH=/opt/rocm/bin:$PATH
+          cmake --build build
+
+      - name: Run Clamp Tests
+        run: |
+          export PATH=/opt/rocm/bin:$PATH
+          ctest --output-on-failure --test-dir build
+          if [ -d build/telemetry ]; then
+            echo "Telemetry detected — stability summary:"
+            cat build/telemetry/*.json | jq '.stability_score'
+          else
+            echo "No telemetry data found — skipping stability summary."
+          fi
+
+      - name: Archive Telemetry
+        if: matrix.config == 'parallel' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clamp-telemetry-${{ matrix.config }}
+          path: build/telemetry
+          if-no-files-found: ignore
