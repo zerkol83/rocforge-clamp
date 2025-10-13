@@ -15,6 +15,8 @@ Each JSON document contains a single object with the top-level property `stabili
 | `released_at`    | string \| null | ISO-8601 UTC timestamp for anchor release; `null` if the anchor is still in-flight.   |
 | `duration_ms`    | number  | Measured lock duration in milliseconds (0.000 precision).                                   |
 | `stability_score`| number  | Normalized (0.0–1.0) stability metric associated with the anchor cycle.                      |
+| `backend`        | string  | Logical execution backend for the record (`CPU`, `HIP`, `Instinct`, etc.).                   |
+| `deviceName`     | string  | Human-readable device identifier; mirrored as `device_name` for legacy consumers.           |
 
 ## Collection Procedure
 
@@ -39,9 +41,11 @@ Future revisions will extend the schema with distributed node identifiers and pr
 | Field              | Type   | Description                                                                 |
 |--------------------|--------|-----------------------------------------------------------------------------|
 | `sourceDirectory`  | string | Absolute directory scanned for session logs (also exported as `source_directory`). |
+| `backend`          | string | Dominant backend for the aggregated sessions (`mixed` if multiple backends detected). |
+| `deviceName`       | string | Representative device for the aggregation (`mixed` or `unspecified` when ambiguous). |
 | `sessionCount`     | number | Total count of aggregated telemetry records (legacy alias `session_count`). |
 | `meanStability`    | number | Arithmetic mean of all stability scores, fixed to six decimal places (`mean_stability`). |
 | `variance`         | number | Sample variance of the stability scores derived from Welford running stats (`stability_variance`). |
 | `driftPercentile`  | number | 95th percentile of recorded lock durations in milliseconds (`drift_index`). |
 
-Legacy snake_case properties remain in the payload for backward compatibility with pre-v0.5 tooling, but downstream consumers should migrate to the camelCase equivalents introduced in Phase 2. The summary file is meant for longitudinal analysis and accompanies the raw session logs in release artifacts and CI uploads.
+Legacy snake_case properties remain in the payload for backward compatibility with pre-v0.5 tooling, but downstream consumers should migrate to the camelCase equivalents introduced in Phase 2. Backend metadata defaults to `CPU/host` for ClampAnchor-driven sessions and automatically flips to `HIP/<device>` when HIP mirror validation executes; mixed directories resolve to `mixed/unspecified`. The summary file is meant for longitudinal analysis and accompanies the raw session logs in release artifacts and CI uploads.

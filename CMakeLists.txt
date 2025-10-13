@@ -25,6 +25,7 @@ add_library(clamp STATIC
     src/telemetry/entropy_validation.hip
     src/scoring/TemporalScoring.cpp
     src/telemetry/temporal_aggregator.cpp
+    src/telemetry/telemetry_compare.cpp
 )
 
 set_source_files_properties(
@@ -105,6 +106,17 @@ target_link_libraries(clamp_inspect_test
 )
 
 add_test(NAME clamp_inspect_test COMMAND clamp_inspect_test)
+
+add_executable(clamp_compare_test
+    tests/test_compare.cpp
+)
+
+target_link_libraries(clamp_compare_test
+    PRIVATE
+        clamp
+)
+
+add_test(NAME clamp_compare_test COMMAND clamp_compare_test)
 
 add_executable(telemetry_inspect
     src/tools/telemetry_inspect.cpp

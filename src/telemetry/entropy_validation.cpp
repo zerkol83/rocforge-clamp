@@ -1,4 +1,5 @@
 #include "clamp.h"
+#include "clamp/EntropyTelemetry.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -30,6 +31,21 @@ bool runHipEntropyMirror(const std::vector<std::uint64_t>& seeds, const std::vec
     int deviceCount = 0;
     if (hipGetDeviceCount(&deviceCount) != hipSuccess || deviceCount == 0) {
         return true;
+    }
+
+    int activeDevice = 0;
+    if (hipGetDevice(&activeDevice) != hipSuccess) {
+        activeDevice = 0;
+    }
+    hipDeviceProp_t props{};
+    if (hipGetDeviceProperties(&props, activeDevice) == hipSuccess) {
+        if (auto* telemetry = EntropyTelemetry::activeInstance()) {
+            telemetry->setBackendMetadata("HIP", props.name);
+        }
+    } else {
+        if (auto* telemetry = EntropyTelemetry::activeInstance()) {
+            telemetry->setBackendMetadata("HIP", "hip-device");
+        }
     }
 
     const std::size_t count = seeds.size();

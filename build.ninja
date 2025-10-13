@@ -92,6 +92,14 @@ build CMakeFiles/clamp.dir/src/telemetry/temporal_aggregator.cpp.o: CXX_COMPILER
   OBJECT_DIR = CMakeFiles/clamp.dir
   OBJECT_FILE_DIR = CMakeFiles/clamp.dir/src/telemetry
 
+build CMakeFiles/clamp.dir/src/telemetry/telemetry_compare.cpp.o: CXX_COMPILER__clamp_unscanned_ /home/zerkol/Dev/rocforge/clamp/src/telemetry/telemetry_compare.cpp || cmake_object_order_depends_target_clamp
+  DEFINES = -DUSE_PROF_API=1 -D__HIP_PLATFORM_AMD__=1
+  DEP_FILE = CMakeFiles/clamp.dir/src/telemetry/telemetry_compare.cpp.o.d
+  FLAGS = -std=c++20
+  INCLUDES = -I/home/zerkol/Dev/rocforge/clamp/include -isystem /opt/rocm/include -isystem /opt/rocm-6.4.4/include
+  OBJECT_DIR = CMakeFiles/clamp.dir
+  OBJECT_FILE_DIR = CMakeFiles/clamp.dir/src/telemetry
+
 
 # =============================================================================
 # Link build statements for STATIC_LIBRARY target clamp
@@ -100,7 +108,7 @@ build CMakeFiles/clamp.dir/src/telemetry/temporal_aggregator.cpp.o: CXX_COMPILER
 #############################################
 # Link the static library libclamp.a
 
-build libclamp.a: HIP_STATIC_LIBRARY_LINKER__clamp_ CMakeFiles/clamp.dir/src/clamp.cpp.o CMakeFiles/clamp.dir/src/telemetry/entropy_telemetry.cpp.o CMakeFiles/clamp.dir/src/telemetry/entropy_validation.cpp.o CMakeFiles/clamp.dir/src/telemetry/entropy_validation.hip.o CMakeFiles/clamp.dir/src/scoring/TemporalScoring.cpp.o CMakeFiles/clamp.dir/src/telemetry/temporal_aggregator.cpp.o
+build libclamp.a: HIP_STATIC_LIBRARY_LINKER__clamp_ CMakeFiles/clamp.dir/src/clamp.cpp.o CMakeFiles/clamp.dir/src/telemetry/entropy_telemetry.cpp.o CMakeFiles/clamp.dir/src/telemetry/entropy_validation.cpp.o CMakeFiles/clamp.dir/src/telemetry/entropy_validation.hip.o CMakeFiles/clamp.dir/src/scoring/TemporalScoring.cpp.o CMakeFiles/clamp.dir/src/telemetry/temporal_aggregator.cpp.o CMakeFiles/clamp.dir/src/telemetry/telemetry_compare.cpp.o
   LANGUAGE_COMPILE_FLAGS = --offload-arch=gfx1100
   OBJECT_DIR = CMakeFiles/clamp.dir
   POST_BUILD = :
@@ -289,6 +297,42 @@ build clamp_inspect_test: HIP_EXECUTABLE_LINKER__clamp_inspect_test_ CMakeFiles/
   TARGET_PDB = clamp_inspect_test.dbg
 
 # =============================================================================
+# Object build statements for EXECUTABLE target clamp_compare_test
+
+
+#############################################
+# Order-only phony target for clamp_compare_test
+
+build cmake_object_order_depends_target_clamp_compare_test: phony || cmake_object_order_depends_target_clamp
+
+build CMakeFiles/clamp_compare_test.dir/tests/test_compare.cpp.o: CXX_COMPILER__clamp_compare_test_unscanned_ /home/zerkol/Dev/rocforge/clamp/tests/test_compare.cpp || cmake_object_order_depends_target_clamp_compare_test
+  DEFINES = -DUSE_PROF_API=1 -D__HIP_PLATFORM_AMD__=1
+  DEP_FILE = CMakeFiles/clamp_compare_test.dir/tests/test_compare.cpp.o.d
+  FLAGS = -std=c++20
+  INCLUDES = -I/home/zerkol/Dev/rocforge/clamp/include -isystem /opt/rocm/include -isystem /opt/rocm-6.4.4/include
+  OBJECT_DIR = CMakeFiles/clamp_compare_test.dir
+  OBJECT_FILE_DIR = CMakeFiles/clamp_compare_test.dir/tests
+
+
+# =============================================================================
+# Link build statements for EXECUTABLE target clamp_compare_test
+
+
+#############################################
+# Link the executable clamp_compare_test
+
+build clamp_compare_test: HIP_EXECUTABLE_LINKER__clamp_compare_test_ CMakeFiles/clamp_compare_test.dir/tests/test_compare.cpp.o | libclamp.a /opt/rocm-6.4.4/lib/librocblas.so.4.4.60404 /opt/rocm/lib/libamdhip64.so.6.4.60404 /opt/rocm-6.4.4/lib/libamdhip64.so.6.4.60404 || libclamp.a
+  DEP_FILE = CMakeFiles/clamp_compare_test.dir/link.d
+  FLAGS = --offload-arch=gfx1100
+  LINK_FLAGS = -Xlinker --dependency-file=CMakeFiles/clamp_compare_test.dir/link.d
+  LINK_LIBRARIES = libclamp.a  /opt/rocm-6.4.4/lib/librocblas.so.4.4.60404  /opt/rocm/lib/libamdhip64.so.6.4.60404  /opt/rocm-6.4.4/lib/libamdhip64.so.6.4.60404  -lgcc  -lgcc
+  OBJECT_DIR = CMakeFiles/clamp_compare_test.dir
+  POST_BUILD = :
+  PRE_LINK = :
+  TARGET_FILE = clamp_compare_test
+  TARGET_PDB = clamp_compare_test.dbg
+
+# =============================================================================
 # Object build statements for EXECUTABLE target telemetry_inspect
 
 
@@ -414,7 +458,7 @@ build clamp: phony libclamp.a
 #############################################
 # Folder: /home/zerkol/Dev/rocforge/clamp
 
-build all: phony libclamp.a clamp_test clamp_scoring_test clamp_aggregator_test clamp_aggregator_extended_test clamp_inspect_test telemetry_inspect
+build all: phony libclamp.a clamp_test clamp_scoring_test clamp_aggregator_test clamp_aggregator_extended_test clamp_inspect_test clamp_compare_test telemetry_inspect
 
 # =============================================================================
 # Built-in targets

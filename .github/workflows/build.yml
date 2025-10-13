@@ -26,7 +26,16 @@ jobs:
       - name: Install build dependencies
         run: |
           apt-get update
-          apt-get install -y ninja-build cmake
+          apt-get install -y cmake ninja-build g++ python3
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: ctest --output-on-failure --test-dir build
 
       - name: Configure Clamp
         run: |

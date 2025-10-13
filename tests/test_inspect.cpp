@@ -71,13 +71,14 @@ int main() {
 
     ensureCommand("./telemetry_inspect --summary > build/inspect_summary.txt");
     const auto summaryOutput = readFile(summaryDump);
+    assert(summaryOutput.find("Backend: unknown  Device: unspecified") != std::string::npos);
     assert(summaryOutput.find("0.8000") != std::string::npos);
     assert(summaryOutput.find("0.0400") != std::string::npos);
     assert(summaryOutput.find("20.0000") != std::string::npos);
 
     ensureCommand("./telemetry_inspect --sessions > build/inspect_sessions.txt");
     const auto sessionsOutput = readFile(sessionsDump);
-    assert(sessionsOutput.find("session_a.json") != std::string::npos);
+    assert(sessionsOutput.find("session_a.json [unknown | unspecified]") != std::string::npos);
     assert(sessionsOutput.find("mean=0.7000") != std::string::npos);
 
     writeTelemetry(summaryPath, "{ \"meanStability\": 0.75 }");

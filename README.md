@@ -32,7 +32,8 @@ The default build links against HIP and rocBLAS, enabling the optional HIP entro
 - JSON snapshots provide machine-readable feeds for ROCForge telemetry ingestion and can be serialised to `/tmp/clamp_telemetry` or a user-specified path.
 - HIP mirroring validates that entropy seeds and state flags observed on the host are consistent on AMD GPUs.
 - `TemporalScoring` consumes telemetry snapshots to produce normalized reproducibility scores (0.0–1.0), entropy variance, duration variance, and drift measurements. Results can be exported as JSON or human-readable summaries for dashboards and CI artifacts.
-- `TemporalAggregator` consolidates telemetry logs under `build/telemetry/`, computes cross-run statistics, and emits `telemetry_summary.json` exposing `meanStability`, `variance`, `driftPercentile`, and `sessionCount` (with legacy snake_case aliases) for versioned reproducibility reporting.
+- `TemporalAggregator` consolidates telemetry logs under `build/telemetry/`, computes cross-run statistics, and emits `telemetry_summary.json` exposing `meanStability`, `variance`, `driftPercentile`, `sessionCount`, and backend/device attribution (with legacy snake_case aliases) for versioned reproducibility reporting.
+- `telemetry_inspect` provides aggregate and per-session views, while `--compare` produces backend parity tables with deltas/variance ratios and writes `telemetry_comparison.json` for automated reporting.
 
 ### ROCm Toolchain Setup
 Ensure HIP and rocBLAS are discoverable by CMake:

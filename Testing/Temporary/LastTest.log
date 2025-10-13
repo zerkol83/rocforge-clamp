@@ -1,102 +1,117 @@
-Start testing: Oct 12 20:28 CDT
+Start testing: Oct 12 20:51 CDT
 ----------------------------------------------------------
-1/5 Testing: clamp_test
-1/5 Test: clamp_test
+1/6 Testing: clamp_test
+1/6 Test: clamp_test
 Command: "/home/zerkol/Dev/rocforge/clamp/clamp_test"
 Directory: /home/zerkol/Dev/rocforge/clamp
-"clamp_test" start time: Oct 12 20:28 CDT
+"clamp_test" start time: Oct 12 20:51 CDT
 Output:
 ----------------------------------------------------------
-[ClampAnchor] Unlocked -> Locked @ 2025-10-12 20:28:46 | Lock acquired for context 'scoped-context', seed 9278421922726774660
-[ClampAnchor] Locked -> Released @ 2025-10-12 20:28:46 | ~ClampAnchor releasing context 'scoped-context'
-[ClampAnchor] Released -> Unlocked @ 2025-10-12 20:28:46 | ~ClampAnchor anchor reset to unlocked
-[ClampAnchor] Unlocked -> Locked @ 2025-10-12 20:28:46 | Lock acquired for context 'unit-test', seed 9278421922726581234
-[ClampAnchor] Locked -> Released @ 2025-10-12 20:28:46 | release() releasing context 'unit-test'
-[ClampAnchor] Released -> Unlocked @ 2025-10-12 20:28:46 | release() anchor reset to unlocked
-[ClampAnchor] Unlocked -> Locked @ 2025-10-12 20:28:46 | Lock acquired for context 'cycle-test', seed 9278421922726590425
-[ClampAnchor] Locked -> Released @ 2025-10-12 20:28:46 | release() releasing context 'cycle-test'
-[ClampAnchor] Released -> Unlocked @ 2025-10-12 20:28:46 | release() anchor reset to unlocked
-[ClampAnchor] Unlocked -> Locked @ 2025-10-12 20:28:46 | Lock acquired for context 'cycle-test', seed 9278421922725526119
-[ClampAnchor] Locked -> Released @ 2025-10-12 20:28:46 | release() releasing context 'cycle-test'
-[ClampAnchor] Released -> Unlocked @ 2025-10-12 20:28:46 | release() anchor reset to unlocked
-[ClampAnchor] Unlocked -> Locked @ 2025-10-12 20:28:46 | Lock acquired for context 'thread-0', seed 15519380575690776847
-[ClampAnchor] Unlocked -> Locked @ 2025-10-12 20:28:46 | Lock acquired for context 'thread-1', seed 8540462370871372264
-[ClampAnchor] Unlocked -> Locked @ 2025-10-12 20:28:46 | Lock acquired for context 'thread-2', seed 4405719722984040721
-[ClampAnchor] Unlocked -> Locked @ 2025-10-12 20:28:46 | Lock acquired for context 'thread-3', seed 15197517912444303935
-[ClampAnchor] Locked -> Released @ 2025-10-12 20:28:46 | release() releasing context 'thread-0'
-[ClampAnchor] Released -> Unlocked @ 2025-10-12 20:28:46 | release() anchor reset to unlocked
-[ClampAnchor] Locked -> Released @ 2025-10-12 20:28:46 | release() releasing context 'thread-2'
-[ClampAnchor] Released -> Unlocked @ 2025-10-12 20:28:46 | release() anchor reset to unlocked
-[ClampAnchor] Locked -> Released @ 2025-10-12 20:28:46 | release() releasing context 'thread-1'
-[ClampAnchor] Released -> Unlocked @ 2025-10-12 20:28:46 | release() anchor reset to unlocked
-[ClampAnchor] Locked -> Released @ 2025-10-12 20:28:46 | release() releasing context 'thread-3'
-[ClampAnchor] Released -> Unlocked @ 2025-10-12 20:28:46 | release() anchor reset to unlocked
+[ClampAnchor] Unlocked -> Locked @ 2025-10-12 20:51:00 | Lock acquired for context 'scoped-context', seed 507025132496054688
+[ClampAnchor] Locked -> Released @ 2025-10-12 20:51:00 | ~ClampAnchor releasing context 'scoped-context'
+[ClampAnchor] Released -> Unlocked @ 2025-10-12 20:51:00 | ~ClampAnchor anchor reset to unlocked
+[ClampAnchor] Unlocked -> Locked @ 2025-10-12 20:51:00 | Lock acquired for context 'unit-test', seed 507025132495145397
+[ClampAnchor] Locked -> Released @ 2025-10-12 20:51:00 | release() releasing context 'unit-test'
+[ClampAnchor] Released -> Unlocked @ 2025-10-12 20:51:00 | release() anchor reset to unlocked
+[ClampAnchor] Unlocked -> Locked @ 2025-10-12 20:51:00 | Lock acquired for context 'cycle-test', seed 507025132495154074
+[ClampAnchor] Locked -> Released @ 2025-10-12 20:51:00 | release() releasing context 'cycle-test'
+[ClampAnchor] Released -> Unlocked @ 2025-10-12 20:51:00 | release() anchor reset to unlocked
+[ClampAnchor] Unlocked -> Locked @ 2025-10-12 20:51:00 | Lock acquired for context 'cycle-test', seed 507025130797528499
+[ClampAnchor] Locked -> Released @ 2025-10-12 20:51:00 | release() releasing context 'cycle-test'
+[ClampAnchor] Released -> Unlocked @ 2025-10-12 20:51:00 | release() anchor reset to unlocked
+[ClampAnchor] Unlocked -> Locked @ 2025-10-12 20:51:00 | Lock acquired for context 'thread-0', seed 743609952643490256
+[ClampAnchor] Unlocked -> Locked @ 2025-10-12 20:51:00 | Lock acquired for context 'thread-1', seed 14113308756812005810
+[ClampAnchor] Unlocked -> Locked @ 2025-10-12 20:51:00 | Lock acquired for context 'thread-2', seed 4748468572811170820
+[ClampAnchor] Unlocked -> Locked @ 2025-10-12 20:51:00 | Lock acquired for context 'thread-3', seed 6378189824653871003
+[ClampAnchor] Locked -> Released @ 2025-10-12 20:51:00 | release() releasing context 'thread-0'
+[ClampAnchor] Released -> Unlocked @ 2025-10-12 20:51:00 | release() anchor reset to unlocked
+[ClampAnchor] Locked -> Released @ 2025-10-12 20:51:00 | release() releasing context 'thread-1'
+[ClampAnchor] Released -> Unlocked @ 2025-10-12 20:51:00 | release() anchor reset to unlocked
+[ClampAnchor] Locked -> Released @ 2025-10-12 20:51:00 | release() releasing context 'thread-3'
+[ClampAnchor] Released -> Unlocked @ 2025-10-12 20:51:00 | release() anchor reset to unlocked
+[ClampAnchor] Locked -> Released @ 2025-10-12 20:51:00 | release() releasing context 'thread-2'
+[ClampAnchor] Released -> Unlocked @ 2025-10-12 20:51:00 | release() anchor reset to unlocked
 <end of output>
 Test time =   0.03 sec
 ----------------------------------------------------------
 Test Passed.
-"clamp_test" end time: Oct 12 20:28 CDT
+"clamp_test" end time: Oct 12 20:51 CDT
 "clamp_test" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-2/5 Testing: clamp_scoring_test
-2/5 Test: clamp_scoring_test
+2/6 Testing: clamp_scoring_test
+2/6 Test: clamp_scoring_test
 Command: "/home/zerkol/Dev/rocforge/clamp/clamp_scoring_test"
 Directory: /home/zerkol/Dev/rocforge/clamp
-"clamp_scoring_test" start time: Oct 12 20:28 CDT
+"clamp_scoring_test" start time: Oct 12 20:51 CDT
 Output:
 ----------------------------------------------------------
 <end of output>
 Test time =   0.02 sec
 ----------------------------------------------------------
 Test Passed.
-"clamp_scoring_test" end time: Oct 12 20:28 CDT
+"clamp_scoring_test" end time: Oct 12 20:51 CDT
 "clamp_scoring_test" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-3/5 Testing: clamp_aggregator_test
-3/5 Test: clamp_aggregator_test
+3/6 Testing: clamp_aggregator_test
+3/6 Test: clamp_aggregator_test
 Command: "/home/zerkol/Dev/rocforge/clamp/clamp_aggregator_test"
 Directory: /home/zerkol/Dev/rocforge/clamp
-"clamp_aggregator_test" start time: Oct 12 20:28 CDT
+"clamp_aggregator_test" start time: Oct 12 20:51 CDT
 Output:
 ----------------------------------------------------------
 <end of output>
 Test time =   0.02 sec
 ----------------------------------------------------------
 Test Passed.
-"clamp_aggregator_test" end time: Oct 12 20:28 CDT
+"clamp_aggregator_test" end time: Oct 12 20:51 CDT
 "clamp_aggregator_test" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-4/5 Testing: clamp_aggregator_extended_test
-4/5 Test: clamp_aggregator_extended_test
+4/6 Testing: clamp_aggregator_extended_test
+4/6 Test: clamp_aggregator_extended_test
 Command: "/home/zerkol/Dev/rocforge/clamp/clamp_aggregator_extended_test"
 Directory: /home/zerkol/Dev/rocforge/clamp
-"clamp_aggregator_extended_test" start time: Oct 12 20:28 CDT
+"clamp_aggregator_extended_test" start time: Oct 12 20:51 CDT
 Output:
 ----------------------------------------------------------
 <end of output>
 Test time =   0.02 sec
 ----------------------------------------------------------
 Test Passed.
-"clamp_aggregator_extended_test" end time: Oct 12 20:28 CDT
+"clamp_aggregator_extended_test" end time: Oct 12 20:51 CDT
 "clamp_aggregator_extended_test" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-5/5 Testing: clamp_inspect_test
-5/5 Test: clamp_inspect_test
+5/6 Testing: clamp_inspect_test
+5/6 Test: clamp_inspect_test
 Command: "/home/zerkol/Dev/rocforge/clamp/clamp_inspect_test"
 Directory: /home/zerkol/Dev/rocforge/clamp
-"clamp_inspect_test" start time: Oct 12 20:28 CDT
+"clamp_inspect_test" start time: Oct 12 20:51 CDT
 Output:
 ----------------------------------------------------------
 <end of output>
 Test time =   0.09 sec
 ----------------------------------------------------------
 Test Passed.
-"clamp_inspect_test" end time: Oct 12 20:28 CDT
+"clamp_inspect_test" end time: Oct 12 20:51 CDT
 "clamp_inspect_test" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-End testing: Oct 12 20:28 CDT
+6/6 Testing: clamp_compare_test
+6/6 Test: clamp_compare_test
+Command: "/home/zerkol/Dev/rocforge/clamp/clamp_compare_test"
+Directory: /home/zerkol/Dev/rocforge/clamp
+"clamp_compare_test" start time: Oct 12 20:51 CDT
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"clamp_compare_test" end time: Oct 12 20:51 CDT
+"clamp_compare_test" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 12 20:51 CDT

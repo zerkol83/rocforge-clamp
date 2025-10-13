@@ -5,8 +5,11 @@
 #include <fstream>
 #include <iomanip>
 #include <sstream>
+#include <utility>
 
 namespace clamp {
+
+EntropyTelemetry* EntropyTelemetry::activeTelemetry_ = nullptr;
 
 namespace {
 
@@ -68,7 +71,16 @@ std::size_t EntropyTelemetry::recordAcquire(const std::string& context, std::uin
     record.threadId = threadIdToString(std::this_thread::get_id());
     record.acquiredAt = std::chrono::system_clock::now();
 
+    setActiveInstance(this);
     std::lock_guard<std::mutex> lock(mutex_);
+    if (backend_.empty()) {
+        backend_ = "CPU";
+    }
+    if (deviceName_.empty()) {
+        deviceName_ = "host";
+    }
+    record.backend = backend_;
+    record.deviceName = deviceName_;
     records_.push_back(record);
     return records_.size() - 1;
 }
@@ -88,6 +100,8 @@ void EntropyTelemetry::recordRelease(std::size_t recordId,
     record.releasedAt = now;
     record.durationMs = std::chrono::duration<double, std::milli>(now - record.acquiredAt).count();
     record.stabilityScore = stabilityScore;
+    record.backend = backend_;
+    record.deviceName = deviceName_;
     if (record.context.empty()) {
         record.context = context;
     }
@@ -107,6 +121,9 @@ std::string EntropyTelemetry::toJson() const {
 
     std::ostringstream oss;
     oss << "{";
+    oss << "\"backend\":\"" << escapeJson(backend_) << "\",";
+    oss << "\"deviceName\":\"" << escapeJson(deviceName_) << "\",";
+    oss << "\"device_name\":\"" << escapeJson(deviceName_) << "\",";
     oss << "\"stability_score\":" << std::fixed << std::setprecision(6) << averageScore << ",";
     oss << std::defaultfloat;
     oss << "\"records\": [";
@@ -118,6 +135,9 @@ std::string EntropyTelemetry::toJson() const {
         oss << "{";
         oss << "\"context\":\"" << escapeJson(record.context) << "\",";
         oss << "\"seed\":" << record.seed << ",";
+        oss << "\"backend\":\"" << escapeJson(record.backend) << "\",";
+        oss << "\"deviceName\":\"" << escapeJson(record.deviceName) << "\",";
+        oss << "\"device_name\":\"" << escapeJson(record.deviceName) << "\",";
         oss << "\"thread_id\":\"" << escapeJson(record.threadId) << "\",";
         oss << "\"acquired_at\":\"" << escapeJson(formatTime(record.acquiredAt)) << "\",";
         if (record.releasedAt) {
@@ -140,6 +160,9 @@ std::vector<AnchorTelemetryRecord> EntropyTelemetry::records() const {
 }
 
 void EntropyTelemetry::merge(const EntropyTelemetry& other) {
+    if (!other.backend().empty() || !other.deviceName().empty()) {
+        setBackendMetadata(other.backend(), other.deviceName());
+    }
     mergeRecords(other.records());
 }
 
@@ -202,6 +225,55 @@ bool EntropyTelemetry::writeJSON(const std::filesystem::path& directory,
     }
     out << payload;
     return out.good();
+}
+
+void EntropyTelemetry::setBackendMetadata(std::string backend, std::string deviceName) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!backend.empty()) {
+        backend_ = std::move(backend);
+    }
+    if (!deviceName.empty()) {
+        deviceName_ = std::move(deviceName);
+    }
+    for (auto& record : records_) {
+        record.backend = backend_;
+        record.deviceName = deviceName_;
+    }
+}
+
+void EntropyTelemetry::ensureBackendTag(const std::string& backend, const std::string& deviceName) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    bool changed = false;
+    if (!backend.empty() && backend_ != backend) {
+        backend_ = backend;
+        changed = true;
+    }
+    if (!deviceName.empty() && deviceName_ != deviceName) {
+        deviceName_ = deviceName;
+        changed = true;
+    }
+    if (changed) {
+        for (auto& record : records_) {
+            record.backend = backend_;
+            record.deviceName = deviceName_;
+        }
+    }
+}
+
+const std::string& EntropyTelemetry::backend() const {
+    return backend_;
+}
+
+const std::string& EntropyTelemetry::deviceName() const {
+    return deviceName_;
+}
+
+void EntropyTelemetry::setActiveInstance(EntropyTelemetry* telemetry) {
+    activeTelemetry_ = telemetry;
+}
+
+EntropyTelemetry* EntropyTelemetry::activeInstance() {
+    return activeTelemetry_;
 }
 
 std::string EntropyTelemetry::formatTime(const std::chrono::system_clock::time_point& tp) {

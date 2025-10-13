@@ -24,12 +24,57 @@ namespace clamp {
 
 namespace {
 
+std::string escapeJson(const std::string& value) {
+    std::ostringstream oss;
+    for (const unsigned char ch : value) {
+        switch (ch) {
+        case '\"':
+            oss << "\\\"";
+            break;
+        case '\\':
+            oss << "\\\\";
+            break;
+        case '\b':
+            oss << "\\b";
+            break;
+        case '\f':
+            oss << "\\f";
+            break;
+        case '\n':
+            oss << "\\n";
+            break;
+        case '\r':
+            oss << "\\r";
+            break;
+        case '\t':
+            oss << "\\t";
+            break;
+        default:
+            if (ch < 0x20) {
+                oss << "\\u"
+                    << std::hex << std::setw(4) << std::setfill('0') << static_cast<int>(ch)
+                    << std::dec << std::setfill(' ');
+            } else {
+                oss << static_cast<char>(ch);
+            }
+            break;
+        }
+    }
+    return oss.str();
+}
+
 struct ParsedRecord {
     double stabilityScore{0.0};
     double durationMs{0.0};
     double timestampMs{std::numeric_limits<double>::quiet_NaN()};
     bool hasStability{false};
     bool hasDuration{false};
+};
+
+struct ParsedFile {
+    std::vector<ParsedRecord> records;
+    std::string backend;
+    std::string deviceName;
 };
 
 double parseIsoTimestampMs(const std::string& value) {
@@ -53,13 +98,48 @@ double parseIsoTimestampMs(const std::string& value) {
 
 #if CLAMP_HAS_NLOHMANN_JSON
 
-std::vector<ParsedRecord> parseJsonWithNlohmann(std::istream& stream) {
+ParsedFile parseJsonWithNlohmann(std::istream& stream) {
     nlohmann::json data = nlohmann::json::parse(stream, nullptr, false);
     if (data.is_discarded()) {
         return {};
     }
 
-    std::vector<ParsedRecord> parsed;
+    ParsedFile parsed;
+    if (data.contains("backend")) {
+        try {
+            parsed.backend = data["backend"].get<std::string>();
+        } catch (const std::exception&) {
+            parsed.backend.clear();
+        }
+    }
+    if (parsed.backend.empty() && data.contains("records") && data["records"].is_array()) {
+        for (const auto& entry : data["records"]) {
+            if (entry.contains("backend")) {
+                try {
+                    parsed.backend = entry["backend"].get<std::string>();
+                    if (!parsed.backend.empty()) {
+                        break;
+                    }
+                } catch (const std::exception&) {
+                    parsed.backend.clear();
+                }
+            }
+        }
+    }
+    if (data.contains("deviceName")) {
+        try {
+            parsed.deviceName = data["deviceName"].get<std::string>();
+        } catch (const std::exception&) {
+            parsed.deviceName.clear();
+        }
+    }
+    if (parsed.deviceName.empty() && data.contains("device_name")) {
+        try {
+            parsed.deviceName = data["device_name"].get<std::string>();
+        } catch (const std::exception&) {
+            parsed.deviceName.clear();
+        }
+    }
     if (!data.contains("records") || !data["records"].is_array()) {
         return parsed;
     }
@@ -96,10 +176,20 @@ std::vector<ParsedRecord> parseJsonWithNlohmann(std::istream& stream) {
             record.timestampMs = parseIsoTimestampMs(entry["acquired_at"].get<std::string>());
         }
         if (!std::isfinite(record.timestampMs)) {
-            record.timestampMs = static_cast<double>(parsed.size());
+            record.timestampMs = static_cast<double>(parsed.records.size());
         }
         if (record.hasStability) {
-            parsed.push_back(record);
+            parsed.records.push_back(record);
+            if (parsed.backend.empty() && entry.contains("backend") && entry["backend"].is_string()) {
+                parsed.backend = entry["backend"].get<std::string>();
+            }
+            if (parsed.deviceName.empty()) {
+                if (entry.contains("deviceName") && entry["deviceName"].is_string()) {
+                    parsed.deviceName = entry["deviceName"].get<std::string>();
+                } else if (entry.contains("device_name") && entry["device_name"].is_string()) {
+                    parsed.deviceName = entry["device_name"].get<std::string>();
+                }
+            }
         }
     }
     return parsed;
@@ -107,17 +197,55 @@ std::vector<ParsedRecord> parseJsonWithNlohmann(std::istream& stream) {
 
 #endif
 
-std::vector<ParsedRecord> parseJsonFallback(std::istream& stream) {
-    std::vector<ParsedRecord> parsed;
+ParsedFile parseJsonFallback(std::istream& stream) {
+    ParsedFile parsed;
     std::string line;
     ParsedRecord record;
     bool inRecord = false;
+    bool inRecordsArray = false;
+    std::string recordBackend;
+    std::string recordDevice;
+    auto extractStringValue = [](const std::string& token) -> std::string {
+        const auto colon = token.find(':');
+        if (colon == std::string::npos) {
+            return {};
+        }
+        auto start = token.find('\"', colon + 1);
+        if (start == std::string::npos) {
+            return {};
+        }
+        ++start;
+        auto end = token.find('\"', start);
+        if (end == std::string::npos) {
+            return {};
+        }
+        return token.substr(start, end - start);
+    };
     while (std::getline(stream, line)) {
         auto trimmed = line;
         trimmed.erase(std::remove_if(trimmed.begin(), trimmed.end(), ::isspace), trimmed.end());
-        if (trimmed.find("{") != std::string::npos) {
+        if (trimmed.rfind("\"records\"", 0) == 0) {
+            inRecordsArray = true;
+        }
+        if (inRecordsArray && trimmed.find("[") != std::string::npos) {
+            continue;
+        }
+        if (!inRecord && inRecordsArray && trimmed.find('{') != std::string::npos) {
             inRecord = true;
             record = ParsedRecord{};
+            recordBackend.clear();
+            recordDevice.clear();
+            if (trimmed.size() == 1) {
+                continue;
+            }
+        }
+        if (!inRecord) {
+            if (trimmed.rfind("\"backend\"", 0) == 0 && parsed.backend.empty()) {
+                parsed.backend = extractStringValue(trimmed);
+            } else if ((trimmed.rfind("\"deviceName\"", 0) == 0 || trimmed.rfind("\"device_name\"", 0) == 0) &&
+                       parsed.deviceName.empty()) {
+                parsed.deviceName = extractStringValue(trimmed);
+            }
         }
         auto keyPos = trimmed.find("\"stability_score\"");
         if (keyPos != std::string::npos) {
@@ -165,17 +293,47 @@ std::vector<ParsedRecord> parseJsonFallback(std::istream& stream) {
                 }
             }
         }
+        keyPos = trimmed.find("\"backend\"");
+        if (inRecord && keyPos != std::string::npos) {
+            const auto value = extractStringValue(trimmed.substr(keyPos));
+            if (!value.empty()) {
+                recordBackend = value;
+            }
+        }
+        keyPos = trimmed.find("\"deviceName\"");
+        if (inRecord && keyPos != std::string::npos) {
+            const auto value = extractStringValue(trimmed.substr(keyPos));
+            if (!value.empty()) {
+                recordDevice = value;
+            }
+        }
+        keyPos = trimmed.find("\"device_name\"");
+        if (inRecord && keyPos != std::string::npos && recordDevice.empty()) {
+            const auto value = extractStringValue(trimmed.substr(keyPos));
+            if (!value.empty()) {
+                recordDevice = value;
+            }
+        }
+        if (trimmed.find("]") != std::string::npos && !inRecord) {
+            inRecordsArray = false;
+        }
         if (trimmed.find("}") != std::string::npos && inRecord) {
             inRecord = false;
-            record.timestampMs = static_cast<double>(parsed.size());
+            record.timestampMs = static_cast<double>(parsed.records.size());
             if (record.hasStability) {
-                parsed.push_back(record);
+                parsed.records.push_back(record);
+                if (parsed.backend.empty() && !recordBackend.empty()) {
+                    parsed.backend = recordBackend;
+                }
+                if (parsed.deviceName.empty() && !recordDevice.empty()) {
+                    parsed.deviceName = recordDevice;
+                }
             }
         }
     }
     return parsed;
 }
-std::vector<ParsedRecord> parseTelemetryFile(const std::filesystem::path& path) {
+ParsedFile parseTelemetryFile(const std::filesystem::path& path) {
     std::ifstream in(path);
     if (!in.is_open()) {
         return {};
@@ -218,6 +376,9 @@ std::string summaryToJson(const TemporalAggregator::Summary& summary,
     oss << "{";
     oss << "\"sourceDirectory\":\"" << sourceDirectory << "\",";
     oss << "\"source_directory\":\"" << sourceDirectory << "\",";
+    oss << "\"backend\":\"" << escapeJson(summary.backend) << "\",";
+    oss << "\"deviceName\":\"" << escapeJson(summary.deviceName) << "\",";
+    oss << "\"device_name\":\"" << escapeJson(summary.deviceName) << "\",";
     oss << "\"sessionCount\":" << summary.sessionCount << ",";
     oss << "\"meanStability\":" << summary.meanStability << ",";
     oss << "\"variance\":" << summary.variance << ",";
@@ -256,6 +417,10 @@ TemporalAggregator::Summary TemporalAggregator::aggregate(const std::filesystem:
     RunningStats stats;
     std::vector<double> durations;
     durations.reserve(64);
+    std::string detectedBackend;
+    std::string detectedDevice;
+    bool mixedBackend = false;
+    bool mixedDevice = false;
 
     for (const auto& entry : std::filesystem::directory_iterator(telemetryDir)) {
         if (!entry.is_regular_file()) {
@@ -265,14 +430,29 @@ TemporalAggregator::Summary TemporalAggregator::aggregate(const std::filesystem:
             continue;
         }
 
-        std::vector<ParsedRecord> records;
+        ParsedFile parsedFile;
         try {
-            records = parseTelemetryFile(entry.path());
+            parsedFile = parseTelemetryFile(entry.path());
         } catch (const std::exception&) {
             continue;
         }
 
-        for (const auto& record : records) {
+        if (!parsedFile.backend.empty()) {
+            if (detectedBackend.empty()) {
+                detectedBackend = parsedFile.backend;
+            } else if (detectedBackend != parsedFile.backend) {
+                mixedBackend = true;
+            }
+        }
+        if (!parsedFile.deviceName.empty()) {
+            if (detectedDevice.empty()) {
+                detectedDevice = parsedFile.deviceName;
+            } else if (detectedDevice != parsedFile.deviceName) {
+                mixedDevice = true;
+            }
+        }
+
+        for (const auto& record : parsedFile.records) {
             if (!record.hasStability || !std::isfinite(record.stabilityScore)) {
                 continue;
             }
@@ -289,6 +469,22 @@ TemporalAggregator::Summary TemporalAggregator::aggregate(const std::filesystem:
     summary.stabilityVariance = summary.variance;
     summary.driftPercentile = computePercentile(durations, 0.95);
     summary.driftIndex = summary.driftPercentile;
+    if (mixedBackend) {
+        summary.backend = "mixed";
+    } else {
+        summary.backend = detectedBackend.empty() ? "unknown" : detectedBackend;
+    }
+    if (mixedDevice) {
+        summary.deviceName = "mixed";
+    } else {
+        summary.deviceName = detectedDevice.empty() ? "unspecified" : detectedDevice;
+    }
+    if (summary.backend.empty()) {
+        summary.backend = "unknown";
+    }
+    if (summary.deviceName.empty()) {
+        summary.deviceName = "unspecified";
+    }
 
     return summary;
 }
@@ -324,6 +520,33 @@ TemporalAggregator::Summary TemporalAggregator::loadSummary(const std::filesyste
         } catch (...) {
         }
     };
+    auto readString = [&json](const std::string& key, std::string& out) {
+        const auto keyPos = json.find(key);
+        if (keyPos == std::string::npos) {
+            return;
+        }
+        const auto colon = json.find(':', keyPos);
+        if (colon == std::string::npos) {
+            return;
+        }
+        auto firstQuote = json.find('\"', colon);
+        if (firstQuote == std::string::npos) {
+            return;
+        }
+        auto endQuote = json.find('\"', firstQuote + 1);
+        while (endQuote != std::string::npos && json[endQuote - 1] == '\\') {
+            endQuote = json.find('\"', endQuote + 1);
+        }
+        if (endQuote == std::string::npos) {
+            return;
+        }
+        out = json.substr(firstQuote + 1, endQuote - firstQuote - 1);
+    };
+    readString("\"backend\"", summary.backend);
+    readString("\"deviceName\"", summary.deviceName);
+    if (summary.deviceName.empty()) {
+        readString("\"device_name\"", summary.deviceName);
+    }
     readValue("\"meanStability\"", summary.meanStability);
     if (summary.meanStability == 0.0) {
         readValue("\"mean_stability\"", summary.meanStability);
@@ -344,6 +567,12 @@ TemporalAggregator::Summary TemporalAggregator::loadSummary(const std::filesyste
         readValue("\"session_count\"", sessionCount);
     }
     summary.sessionCount = static_cast<std::size_t>(sessionCount);
+    if (summary.backend.empty()) {
+        summary.backend = "unknown";
+    }
+    if (summary.deviceName.empty()) {
+        summary.deviceName = "unspecified";
+    }
     return summary;
 }
 
@@ -360,13 +589,13 @@ std::vector<TemporalAggregator::SessionDetail> TemporalAggregator::loadSessions(
         RunningStats stats;
         std::vector<double> durations;
         durations.reserve(16);
-        std::vector<ParsedRecord> records;
+        ParsedFile parsedFile;
         try {
-            records = parseTelemetryFile(entry.path());
+            parsedFile = parseTelemetryFile(entry.path());
         } catch (const std::exception&) {
             continue;
         }
-        for (const auto& record : records) {
+        for (const auto& record : parsedFile.records) {
             if (!record.hasStability || !std::isfinite(record.stabilityScore)) {
                 continue;
             }
@@ -384,6 +613,8 @@ std::vector<TemporalAggregator::SessionDetail> TemporalAggregator::loadSessions(
         summary.stabilityVariance = summary.variance;
         summary.driftPercentile = computePercentile(durations, 0.95);
         summary.driftIndex = summary.driftPercentile;
+        summary.backend = parsedFile.backend.empty() ? "unknown" : parsedFile.backend;
+        summary.deviceName = parsedFile.deviceName.empty() ? "unspecified" : parsedFile.deviceName;
         sessions.push_back(SessionDetail{entry.path().filename(), summary});
     }
     std::sort(sessions.begin(), sessions.end(),

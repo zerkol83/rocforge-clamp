@@ -16,6 +16,8 @@ public:
         std::size_t sessionCount{0};
         double stabilityVariance{0.0};
         double driftIndex{0.0};
+        std::string backend;
+        std::string deviceName;
     };
 
     struct SessionDetail {

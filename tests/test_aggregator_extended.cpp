@@ -67,6 +67,8 @@ int main() {
     assert(summary.stabilityVariance == summary.variance);
     assert(summary.driftPercentile >= 0.0);
     assert(summary.driftIndex == summary.driftPercentile);
+    assert(summary.backend == "unknown");
+    assert(summary.deviceName == "unspecified");
 
     assert(std::filesystem::exists(summaryPath));
     const auto firstSnapshot = slurpFile(summaryPath);
@@ -74,6 +76,7 @@ int main() {
     assert(firstSnapshot.find("\"variance\"") != std::string::npos);
     assert(firstSnapshot.find("\"sessionCount\"") != std::string::npos);
     assert(firstSnapshot.find("\"mean_stability\"") != std::string::npos);
+    assert(firstSnapshot.find("\"backend\"") != std::string::npos);
 
     const auto repeated = aggregator.accumulate(workspace);
     const auto secondSnapshot = slurpFile(summaryPath);

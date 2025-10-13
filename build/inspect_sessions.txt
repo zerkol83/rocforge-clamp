@@ -1,7 +1,7 @@
 Session breakdown:
-session_a.json mean=0.7000 count=2
+session_a.json [unknown | unspecified] mean=0.7000 count=2
   mean  #####################.........
   drift ##########.................... (p95=10.00)
-session_b.json mean=1.0000 count=1
+session_b.json [unknown | unspecified] mean=1.0000 count=1
   mean  ##############################
   drift ############################## (p95=30.00)

@@ -19,9 +19,12 @@ From the project root (after building with Ninja):
 ./telemetry_inspect            # Aggregate table plus per-session breakdown
 ./telemetry_inspect --summary  # Aggregate table only
 ./telemetry_inspect --sessions # Per-session view only
+./telemetry_inspect --compare build/telemetry_summary_*.json  # Backend parity report + JSON export
 ```
 
 The per-session output renders ASCII bars scaled to the maximum observed values. `#` characters mark relative magnitude, while `(p95=…)` displays the exact drift percentile for each session file.
+
+`--compare` loads one or more summary artifacts (glob-friendly) and prints a parity table with backend/device labels, mean deltas, drift skew, and variance ratios. The most stable backend is annotated with an upward arrow (`↑`), while regressions are marked with `↓`. Drift deltas that exceed ±5 ms carry a trailing `*`, mirroring the `telemetry_comparison.json` summary emitted to `build/`.
 
 Example session snippet:
 

@@ -4,6 +4,7 @@
 #include <cassert>
 #include <chrono>
 #include <ctime>
+#include <cstdlib>
 #include <functional>
 #include <iomanip>
 #include <iostream>
@@ -22,6 +23,18 @@ std::tm toLocalTime(const std::chrono::system_clock::time_point& tp) {
     localtime_r(&rawTime, &result);
 #endif
     return result;
+}
+
+std::string detectHostDeviceName() {
+    if (const char* hostname = std::getenv("HOSTNAME")) {
+        return hostname;
+    }
+#if defined(_WIN32)
+    if (const char* computerName = std::getenv("COMPUTERNAME")) {
+        return computerName;
+    }
+#endif
+    return "host";
 }
 } // namespace
 
@@ -84,6 +97,8 @@ void ClampAnchor::lock(const std::string& ctx) {
     setState(AnchorState::Locked,
              "Lock acquired for context '" + ctx + "', seed " + std::to_string(state_.entropySeed));
     if (telemetry_) {
+        telemetry_->ensureBackendTag("CPU", detectHostDeviceName());
+        EntropyTelemetry::setActiveInstance(telemetry_);
         activeTelemetryRecord_ = telemetry_->recordAcquire(ctx, state_.entropySeed);
     }
 }
@@ -127,6 +142,7 @@ std::uint64_t ClampAnchor::entropySeed() const {
 
 void ClampAnchor::attachTelemetry(EntropyTelemetry* telemetry) {
     telemetry_ = telemetry;
+    EntropyTelemetry::setActiveInstance(telemetry);
 }
 
 const EntropyTelemetry* ClampAnchor::telemetry() const {

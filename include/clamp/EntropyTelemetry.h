@@ -19,6 +19,8 @@ struct AnchorTelemetryRecord {
     std::optional<std::chrono::system_clock::time_point> releasedAt;
     double durationMs{0.0};
     double stabilityScore{0.0};
+    std::string backend;
+    std::string deviceName;
 };
 
 class EntropyTelemetry {
@@ -35,6 +37,12 @@ public:
     void merge(const EntropyTelemetry& other);
     void mergeRecords(const std::vector<AnchorTelemetryRecord>& externalRecords);
     void alignToReference(const std::chrono::system_clock::time_point& reference);
+    void setBackendMetadata(std::string backend, std::string deviceName);
+    void ensureBackendTag(const std::string& backend, const std::string& deviceName);
+    const std::string& backend() const;
+    const std::string& deviceName() const;
+    static void setActiveInstance(EntropyTelemetry* telemetry);
+    static EntropyTelemetry* activeInstance();
 
     bool writeJSON(const std::filesystem::path& directory = std::filesystem::path{"telemetry"},
                    const std::string& filenameHint = "clamp_run") const;
@@ -50,6 +58,9 @@ private:
 
     mutable std::mutex mutex_;
     std::vector<AnchorTelemetryRecord> records_;
+    std::string backend_{"CPU"};
+    std::string deviceName_{"host"};
+    static EntropyTelemetry* activeTelemetry_;
 };
 
 } // namespace clamp
