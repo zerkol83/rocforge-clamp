@@ -6,6 +6,14 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+if(NOT DEFINED HIP_DIR)
+    set(HIP_DIR "/opt/rocm/lib/cmake/hip" CACHE PATH "Path to HIPConfig.cmake")
+endif()
+
+if(NOT DEFINED CMAKE_PREFIX_PATH)
+    set(CMAKE_PREFIX_PATH "/opt/rocm;/opt/rocm/lib/cmake" CACHE STRING "Additional search prefixes for ROCm components")
+endif()
+
 find_package(HIP REQUIRED)
 enable_language(HIP)
 find_package(rocblas REQUIRED)
@@ -21,6 +29,12 @@ add_library(clamp STATIC
 
 set_source_files_properties(
     src/telemetry/entropy_validation.hip
+    PROPERTIES
+        LANGUAGE HIP
+)
+
+set_source_files_properties(
+    src/telemetry/entropy_validation.cpp
     PROPERTIES
         LANGUAGE HIP
 )

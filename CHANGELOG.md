@@ -22,7 +22,7 @@ Key Enhancements
 
 - TemporalScoring module computes stability scores, variance metrics, and drift analysis with JSON and plain-text reporting.
 - EntropyTelemetry gains distributed aggregation, timestamp alignment, and filesystem archival capabilities.
-- TemporalAggregator consolidates per-run telemetry into `telemetry_summary.json`, exposing mean/variance/drift metrics for downstream analysis.
+- TemporalAggregator consolidates per-run telemetry into `telemetry_summary.json`, exposing `mean_stability`, `stability_variance`, `drift_index`, and `session_count` for downstream analysis.
 - Expanded CTest coverage validates scoring, multi-thread entropy reproducibility, and HIP mirroring across aggregated datasets.
 - Telemetry schema formally documented in `docs/telemetry_spec.md`, ensuring downstream consumers share a consistent contract.
 - GitHub Actions workflow now runs matrix builds with parallel test execution and publishes telemetry artifacts.

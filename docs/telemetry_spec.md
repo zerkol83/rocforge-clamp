@@ -31,3 +31,17 @@ Each JSON document contains a single object with the top-level property `stabili
 - Telemetry files must be preserved as CI artifacts for every tagged release. Validation scripts may inspect aggregate stability using `jq '.stability_score' build/telemetry/*.json` or per-record data with `jq '.records[].stability_score' build/telemetry/*.json`.
 
 Future revisions will extend the schema with distributed node identifiers and probabilistic scoring metadata as the ROCForge reproducibility framework evolves.
+
+## Summary Artifact
+
+`TemporalAggregator` consumes all session files beneath `build/telemetry/` and emits `build/telemetry_summary.json` with the following top-level fields:
+
+| Field              | Type   | Description                                                        |
+|--------------------|--------|--------------------------------------------------------------------|
+| `source_directory` | string | Directory scanned for session logs.                                |
+| `session_count`    | number | Total count of aggregated telemetry records.                       |
+| `mean_stability`   | number | Arithmetic mean of all stability scores (fixed 6 decimal places).  |
+| `stability_variance` | number | Sample variance of the stability scores.                         |
+| `drift_index`      | number | Difference between earliest and latest session timestamps (ms).    |
+
+The summary file is meant for longitudinal analysis and accompanies the raw session logs in release artifacts and CI uploads.

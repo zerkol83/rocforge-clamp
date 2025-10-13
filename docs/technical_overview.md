@@ -21,6 +21,7 @@
 - **Entropy Deviation**: Seeds collected across threads are compared for drift and collision detection.
 - **State Fidelity**: Transition logs ensure anchors never bypass expected `Unlocked → Locked → Released → Unlocked` progressions.
 - **Temporal Reproducibility Score**: `TemporalScoring` produces a normalized 0.0–1.0 index by combining entropy variance, duration variance, and drift components, providing a quantitative definition of stability across sequential and parallel workloads.
+- **Aggregate Stability Summary**: `TemporalAggregator` merges multiple session logs into `telemetry_summary.json`, reporting `mean_stability`, `stability_variance`, `drift_index`, and `session_count` for longitudinal analysis.
 
 ## Experimental Protocol
 1. Execute the standard validation loop (`ctest --output-on-failure`) to produce telemetry snapshots.

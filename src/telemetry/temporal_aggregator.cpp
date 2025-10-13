@@ -1,12 +1,16 @@
 #include "clamp/TemporalAggregator.h"
 
-#include "clamp/EntropyTelemetry.h"
-
 #include <algorithm>
+#include <cctype>
+#include <chrono>
+#include <cmath>
+#include <cstring>
 #include <fstream>
+#include <iomanip>
 #include <limits>
 #include <numeric>
 #include <sstream>
+#include <stdexcept>
 
 #if __has_include(<nlohmann/json.hpp>)
 #include <nlohmann/json.hpp>
@@ -22,8 +26,27 @@ namespace {
 struct ParsedRecord {
     double stabilityScore{0.0};
     double durationMs{0.0};
-    double acquiredMs{0.0};
+    double timestampMs{std::numeric_limits<double>::quiet_NaN()};
 };
+
+double parseIsoTimestampMs(const std::string& value) {
+    using namespace std::chrono;
+    std::istringstream stream(value);
+    sys_time<milliseconds> timePoint{};
+    stream >> std::chrono::parse("%FT%TZ", timePoint);
+    if (!stream.fail()) {
+        return static_cast<double>(timePoint.time_since_epoch().count());
+    }
+
+    stream.clear();
+    stream.str(value);
+    stream >> std::chrono::parse("%FT%T", timePoint);
+    if (!stream.fail()) {
+        return static_cast<double>(timePoint.time_since_epoch().count());
+    }
+
+    return std::numeric_limits<double>::quiet_NaN();
+}
 
 #if CLAMP_HAS_NLOHMANN_JSON
 
@@ -46,10 +69,11 @@ std::vector<ParsedRecord> parseJsonWithNlohmann(std::istream& stream) {
         if (entry.contains("duration_ms")) {
             record.durationMs = entry["duration_ms"].get<double>();
         }
-        if (entry.contains("acquired_at")) {
-            // attempt to parse ISO string into milliseconds by relying on order
-            // this will be refined later with a dedicated parser
-            record.acquiredMs = static_cast<double>(parsed.size());
+        if (entry.contains("acquired_at") && entry["acquired_at"].is_string()) {
+            record.timestampMs = parseIsoTimestampMs(entry["acquired_at"].get<std::string>());
+        }
+        if (!std::isfinite(record.timestampMs)) {
+            record.timestampMs = static_cast<double>(parsed.size());
         }
         parsed.push_back(record);
     }
@@ -70,20 +94,53 @@ std::vector<ParsedRecord> parseJsonFallback(std::istream& stream) {
             inRecord = true;
             record = ParsedRecord{};
         }
-        if (trimmed.find("\"stability_score\"") != std::string::npos) {
-            const auto pos = trimmed.find(":");
+        auto keyPos = trimmed.find("\"stability_score\"");
+        if (keyPos != std::string::npos) {
+            const auto pos = trimmed.find(":", keyPos + std::strlen("\"stability_score\""));
             if (pos != std::string::npos) {
-                record.stabilityScore = std::stod(trimmed.substr(pos + 1));
+                auto token = trimmed.substr(pos + 1);
+                std::size_t begin = 0;
+                while (begin < token.size() && std::isspace(static_cast<unsigned char>(token[begin]))) {
+                    ++begin;
+                }
+                std::size_t end = token.size();
+                while (end > begin && (std::isspace(static_cast<unsigned char>(token[end - 1])) ||
+                                       token[end - 1] == ',' || token[end - 1] == '}' || token[end - 1] == ']')) {
+                    --end;
+                }
+                auto cleaned = token.substr(begin, end - begin);
+                if (cleaned.empty() || (!std::isdigit(static_cast<unsigned char>(cleaned.front())) &&
+                                        cleaned.front() != '-' && cleaned.front() != '+')) {
+                    throw std::invalid_argument("Invalid numeric field in telemetry input: '" + token + "'");
+                }
+                record.stabilityScore = std::stod(cleaned);
             }
         }
-        if (trimmed.find("\"duration_ms\"") != std::string::npos) {
-            const auto pos = trimmed.find(":");
+        keyPos = trimmed.find("\"duration_ms\"");
+        if (keyPos != std::string::npos) {
+            const auto pos = trimmed.find(":", keyPos + std::strlen("\"duration_ms\""));
             if (pos != std::string::npos) {
-                record.durationMs = std::stod(trimmed.substr(pos + 1));
+                auto token = trimmed.substr(pos + 1);
+                std::size_t begin = 0;
+                while (begin < token.size() && std::isspace(static_cast<unsigned char>(token[begin]))) {
+                    ++begin;
+                }
+                std::size_t end = token.size();
+                while (end > begin && (std::isspace(static_cast<unsigned char>(token[end - 1])) ||
+                                       token[end - 1] == ',' || token[end - 1] == '}' || token[end - 1] == ']')) {
+                    --end;
+                }
+                auto cleaned = token.substr(begin, end - begin);
+                if (cleaned.empty() || (!std::isdigit(static_cast<unsigned char>(cleaned.front())) &&
+                                        cleaned.front() != '-' && cleaned.front() != '+')) {
+                    throw std::invalid_argument("Invalid numeric field in telemetry input: '" + token + "'");
+                }
+                record.durationMs = std::stod(cleaned);
             }
         }
         if (trimmed.find("}") != std::string::npos && inRecord) {
             inRecord = false;
+            record.timestampMs = static_cast<double>(parsed.size());
             parsed.push_back(record);
         }
     }
@@ -102,119 +159,87 @@ std::vector<ParsedRecord> parseTelemetryFile(const std::filesystem::path& path) 
 #endif
 }
 
-double computeMean(const std::vector<double>& values) {
-    if (values.empty()) {
-        return 0.0;
-    }
-    return std::accumulate(values.begin(), values.end(), 0.0) / static_cast<double>(values.size());
-}
-
-double computeVariance(const std::vector<double>& values, double mean) {
-    if (values.size() < 2) {
-        return 0.0;
-    }
-    double variance = 0.0;
-    for (const double value : values) {
-        const double diff = value - mean;
-        variance += diff * diff;
-    }
-    return variance / static_cast<double>(values.size() - 1);
-}
-
-double computeDrift(const std::vector<ParsedRecord>& records) {
-    if (records.size() < 2) {
-        return 0.0;
-    }
-    double minIndex = std::numeric_limits<double>::max();
-    double maxIndex = std::numeric_limits<double>::lowest();
-    for (std::size_t i = 0; i < records.size(); ++i) {
-        const double value = static_cast<double>(i);
-        minIndex = std::min(minIndex, value);
-        maxIndex = std::max(maxIndex, value);
-    }
-    return maxIndex - minIndex;
-}
-
-TemporalAggregator::Summary makeSummary(const std::vector<ParsedRecord>& records) {
-    TemporalAggregator::Summary summary;
-    if (records.empty()) {
-        return summary;
+struct RunningStats {
+    void add(double value) {
+        ++count;
+        const double delta = value - mean;
+        mean += delta / static_cast<double>(count);
+        const double delta2 = value - mean;
+        m2 += delta * delta2;
     }
 
-    std::vector<double> stability;
-    std::vector<double> duration;
-    stability.reserve(records.size());
-    duration.reserve(records.size());
-
-    for (const auto& record : records) {
-        stability.push_back(record.stabilityScore);
-        duration.push_back(record.durationMs);
+    double variance() const {
+        if (count < 2) {
+            return 0.0;
+        }
+        return m2 / static_cast<double>(count - 1);
     }
 
-    summary.stabilityMean = computeMean(stability);
-    summary.stabilityVariance = computeVariance(stability, summary.stabilityMean);
-    summary.durationMean = computeMean(duration);
-    summary.durationVariance = computeVariance(duration, summary.durationMean);
-    summary.driftMs = computeDrift(records);
-    summary.sampleCount = records.size();
-    return summary;
-}
+    double mean{0.0};
+    double m2{0.0};
+    std::size_t count{0};
+};
 
 std::string summaryToJson(const TemporalAggregator::Summary& summary,
                           const std::string& sourceDirectory) {
     std::ostringstream oss;
+    oss << std::fixed << std::setprecision(6);
     oss << "{";
     oss << "\"source_directory\":\"" << sourceDirectory << "\",";
-    oss << "\"sample_count\":" << summary.sampleCount << ",";
-    oss << "\"stability_mean\":" << summary.stabilityMean << ",";
+    oss << "\"session_count\":" << summary.sessionCount << ",";
+    oss << "\"mean_stability\":" << summary.meanStability << ",";
     oss << "\"stability_variance\":" << summary.stabilityVariance << ",";
-    oss << "\"duration_mean\":" << summary.durationMean << ",";
-    oss << "\"duration_variance\":" << summary.durationVariance << ",";
-    oss << "\"drift_ms\":" << summary.driftMs;
+    oss << "\"drift_index\":" << summary.driftIndex;
     oss << "}";
     return oss.str();
 }
 
 } // namespace
 
-TemporalAggregator::Summary TemporalAggregator::combine(const Summary& lhs, const Summary& rhs) {
-    Summary combined;
-    combined.sampleCount = lhs.sampleCount + rhs.sampleCount;
-    if (combined.sampleCount == 0) {
-        return combined;
-    }
-
-    const double lhsWeight = static_cast<double>(lhs.sampleCount);
-    const double rhsWeight = static_cast<double>(rhs.sampleCount);
-
-    combined.stabilityMean = (lhs.stabilityMean * lhsWeight + rhs.stabilityMean * rhsWeight) /
-                             static_cast<double>(combined.sampleCount);
-    combined.durationMean = (lhs.durationMean * lhsWeight + rhs.durationMean * rhsWeight) /
-                            static_cast<double>(combined.sampleCount);
-
-    combined.stabilityVariance = lhs.stabilityVariance + rhs.stabilityVariance;
-    combined.durationVariance = lhs.durationVariance + rhs.durationVariance;
-    combined.driftMs = std::max(lhs.driftMs, rhs.driftMs);
-
-    return combined;
-}
-
 TemporalAggregator::Summary TemporalAggregator::aggregate(const std::filesystem::path& telemetryDir) {
     Summary summary;
-    summary.sampleCount = 0;
-
     if (!std::filesystem::exists(telemetryDir)) {
         return summary;
     }
+
+    RunningStats stats;
+    double minTimestamp = std::numeric_limits<double>::infinity();
+    double maxTimestamp = -std::numeric_limits<double>::infinity();
+    double sequentialIndex = 0.0;
 
     for (const auto& entry : std::filesystem::directory_iterator(telemetryDir)) {
         if (!entry.is_regular_file()) {
             continue;
         }
+
         const auto records = parseTelemetryFile(entry.path());
-        const auto localSummary = makeSummary(records);
-        summary = combine(summary, localSummary);
+        for (const auto& record : records) {
+            stats.add(record.stabilityScore);
+
+            double timestamp = record.timestampMs;
+            if (!std::isfinite(timestamp)) {
+                timestamp = sequentialIndex;
+            }
+
+            minTimestamp = std::min(minTimestamp, timestamp);
+            maxTimestamp = std::max(maxTimestamp, timestamp);
+            sequentialIndex += 1.0;
+        }
     }
+
+    summary.sessionCount = stats.count;
+    if (stats.count == 0) {
+        summary.meanStability = 0.0;
+        summary.stabilityVariance = 0.0;
+        summary.driftIndex = 0.0;
+        return summary;
+    }
+
+    summary.meanStability = stats.mean;
+    summary.stabilityVariance = stats.variance();
+    summary.driftIndex = (stats.count > 1 && std::isfinite(minTimestamp) && std::isfinite(maxTimestamp))
+                            ? (maxTimestamp - minTimestamp)
+                            : 0.0;
 
     return summary;
 }
@@ -223,7 +248,10 @@ bool TemporalAggregator::writeSummary(const Summary& summary,
                                       const std::filesystem::path& outputPath,
                                       const std::string& sourceDirectory) const {
     std::error_code ec;
-    std::filesystem::create_directories(outputPath.parent_path(), ec);
+    const auto parent = outputPath.parent_path();
+    if (!parent.empty()) {
+        std::filesystem::create_directories(parent, ec);
+    }
     std::ofstream out(outputPath);
     if (!out.is_open()) {
         return false;

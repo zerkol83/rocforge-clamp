@@ -7,28 +7,28 @@
 
 namespace {
 
-std::string makeRecord(double stability, double duration) {
-    return "{ \"context\": \"test\", \"seed\": 1, \"thread_id\": \"0\", "
-           "\"acquired_at\": \"2025-01-01T00:00:00Z\", "
-           "\"released_at\": \"2025-01-01T00:00:01Z\", "
-           "\"duration_ms\": " + std::to_string(duration) + ", "
-           "\"stability_score\": " + std::to_string(stability) + " }";
-}
-
 void writeTelemetryFile(const std::filesystem::path& path,
                         std::initializer_list<std::pair<double, double>> values) {
     std::filesystem::create_directories(path.parent_path());
     std::ofstream out(path);
-    out << "{ \"records\": [";
+    out << "{\n  \"records\": [\n";
     bool first = true;
     for (const auto& [stability, duration] : values) {
         if (!first) {
-            out << ", ";
+            out << ",\n";
         }
         first = false;
-        out << makeRecord(stability, duration);
+        out << "    {\n"
+            << "      \"context\": \"test\",\n"
+            << "      \"seed\": 1,\n"
+            << "      \"thread_id\": \"0\",\n"
+            << "      \"acquired_at\": \"2025-01-01T00:00:00Z\",\n"
+            << "      \"released_at\": \"2025-01-01T00:00:01Z\",\n"
+            << "      \"duration_ms\": " << duration << ",\n"
+            << "      \"stability_score\": " << stability << "\n"
+            << "    }";
     }
-    out << "] }";
+    out << "\n  ]\n}\n";
 }
 
 } // namespace
@@ -43,9 +43,10 @@ int main() {
 
     clamp::TemporalAggregator aggregator;
     const auto summary = aggregator.aggregate(baseDir);
-    assert(summary.sampleCount == 3);
-    assert(summary.stabilityMean > 0.7);
-    assert(summary.durationMean > 4.0);
+    assert(summary.sessionCount == 3);
+    assert(summary.meanStability > 0.7);
+    assert(summary.stabilityVariance >= 0.0);
+    assert(summary.driftIndex >= 0.0);
 
     const auto outputPath = std::filesystem::current_path() / "telemetry_summary.json";
     assert(aggregator.writeSummary(summary, outputPath, baseDir.string()));
@@ -55,8 +56,9 @@ int main() {
     assert(in.is_open());
     std::string contents((std::istreambuf_iterator<char>(in)),
                          std::istreambuf_iterator<char>());
-    assert(contents.find("\"sample_count\"") != std::string::npos);
-    assert(contents.find("\"stability_mean\"") != std::string::npos);
+    assert(contents.find("\"session_count\"") != std::string::npos);
+    assert(contents.find("\"mean_stability\"") != std::string::npos);
+    assert(contents.find("\"drift_index\"") != std::string::npos);
 
     return 0;
 }

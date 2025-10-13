@@ -32,6 +32,17 @@ The default build links against HIP and rocBLAS, enabling the optional HIP entro
 - JSON snapshots provide machine-readable feeds for ROCForge telemetry ingestion and can be serialised to `/tmp/clamp_telemetry` or a user-specified path.
 - HIP mirroring validates that entropy seeds and state flags observed on the host are consistent on AMD GPUs.
 - `TemporalScoring` consumes telemetry snapshots to produce normalized reproducibility scores (0.0–1.0), entropy variance, duration variance, and drift measurements. Results can be exported as JSON or human-readable summaries for dashboards and CI artifacts.
-- `TemporalAggregator` consolidates telemetry logs under `build/telemetry/`, computes cross-run statistics, and emits `telemetry_summary.json` for versioned reproducibility reporting.
+- `TemporalAggregator` consolidates telemetry logs under `build/telemetry/`, computes cross-run statistics, and emits `telemetry_summary.json` exposing `mean_stability`, `stability_variance`, `drift_index`, and `session_count` for versioned reproducibility reporting.
+
+### ROCm Toolchain Setup
+Ensure HIP and rocBLAS are discoverable by CMake:
+```bash
+export HIP_DIR=/opt/rocm/lib/cmake/hip
+export CMAKE_PREFIX_PATH=/opt/rocm:/opt/rocm/lib/cmake
+cmake -S . -B build -G Ninja
+cmake --build build
+ctest --output-on-failure --test-dir build
+```
+Adjust `/opt/rocm` if ROCm is installed elsewhere.
 
 See `docs/technical_overview.md` for an in-depth discussion of the entropy lifecycle, temporal alignment algorithms, ROCm dependency graph, and stability metrics captured during the v0.4 validation campaign. The telemetry schema and reproducibility guarantees are defined in `docs/telemetry_spec.md`.

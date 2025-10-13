@@ -1,2 +1,6 @@
-clamp_test 4 0.000862155
+clamp_test 6 0.000572066
+clamp_scoring_test 0 0
+clamp_aggregator_test 0 0
 ---
+clamp_scoring_test
+clamp_aggregator_test

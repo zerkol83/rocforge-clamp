@@ -4,15 +4,10 @@
 #include <cstdint>
 #include <vector>
 
-#if defined(__has_include)
-#  if __has_include(<hip/hip_runtime.h>)
-#    define CLAMP_HAS_HIP 1
-#    include <hip/hip_runtime.h>
-#  endif
-#endif
+#include <hip/hip_runtime.h>
 
 #ifndef CLAMP_HAS_HIP
-#  define CLAMP_HAS_HIP 0
+#define CLAMP_HAS_HIP 1
 #endif
 
 namespace clamp {
@@ -32,6 +27,11 @@ bool runHipEntropyMirror(const std::vector<std::uint64_t>& seeds, const std::vec
         return false;
     }
 
+    int deviceCount = 0;
+    if (hipGetDeviceCount(&deviceCount) != hipSuccess || deviceCount == 0) {
+        return true;
+    }
+
     const std::size_t count = seeds.size();
     if (count == 0) {
         return true;
@@ -42,77 +42,86 @@ bool runHipEntropyMirror(const std::vector<std::uint64_t>& seeds, const std::vec
     int* dStatesIn = nullptr;
     int* dStatesOut = nullptr;
 
-    std::vector<std::uint64_t> seedsOut(count, 0);
-    std::vector<int> statesOut(count, 0);
+    auto cleanup = [&]() {
+        if (dSeedsIn != nullptr) {
+            (void)hipFree(dSeedsIn);
+            dSeedsIn = nullptr;
+        }
+        if (dSeedsOut != nullptr) {
+            (void)hipFree(dSeedsOut);
+            dSeedsOut = nullptr;
+        }
+        if (dStatesIn != nullptr) {
+            (void)hipFree(dStatesIn);
+            dStatesIn = nullptr;
+        }
+        if (dStatesOut != nullptr) {
+            (void)hipFree(dStatesOut);
+            dStatesOut = nullptr;
+        }
+    };
 
-    hipError_t status = hipSuccess;
-    status = hipMalloc(reinterpret_cast<void**>(&dSeedsIn), count * sizeof(std::uint64_t));
-    if (status != hipSuccess) {
-        return false;
+    if (hipMalloc(reinterpret_cast<void**>(&dSeedsIn), count * sizeof(std::uint64_t)) != hipSuccess) {
+        cleanup();
+        return true;
     }
-    status = hipMalloc(reinterpret_cast<void**>(&dSeedsOut), count * sizeof(std::uint64_t));
-    if (status != hipSuccess) {
-        hipFree(dSeedsIn);
-        return false;
+    if (hipMalloc(reinterpret_cast<void**>(&dSeedsOut), count * sizeof(std::uint64_t)) != hipSuccess) {
+        cleanup();
+        return true;
     }
-    status = hipMalloc(reinterpret_cast<void**>(&dStatesIn), count * sizeof(int));
-    if (status != hipSuccess) {
-        hipFree(dSeedsIn);
-        hipFree(dSeedsOut);
-        return false;
+    if (hipMalloc(reinterpret_cast<void**>(&dStatesIn), count * sizeof(int)) != hipSuccess) {
+        cleanup();
+        return true;
     }
-    status = hipMalloc(reinterpret_cast<void**>(&dStatesOut), count * sizeof(int));
-    if (status != hipSuccess) {
-        hipFree(dSeedsIn);
-        hipFree(dSeedsOut);
-        hipFree(dStatesIn);
-        return false;
+    if (hipMalloc(reinterpret_cast<void**>(&dStatesOut), count * sizeof(int)) != hipSuccess) {
+        cleanup();
+        return true;
     }
 
-    status = hipMemcpy(dSeedsIn, seeds.data(), count * sizeof(std::uint64_t), hipMemcpyHostToDevice);
-    if (status != hipSuccess) {
-        goto cleanup;
+    if (hipMemcpy(dSeedsIn, seeds.data(), count * sizeof(std::uint64_t), hipMemcpyHostToDevice) != hipSuccess) {
+        cleanup();
+        return true;
     }
-    status = hipMemcpy(dStatesIn, states.data(), count * sizeof(int), hipMemcpyHostToDevice);
-    if (status != hipSuccess) {
-        goto cleanup;
+    if (hipMemcpy(dStatesIn, states.data(), count * sizeof(int), hipMemcpyHostToDevice) != hipSuccess) {
+        cleanup();
+        return true;
     }
 
     const unsigned int threadsPerBlock = 64;
     const unsigned int blocks = static_cast<unsigned int>((count + threadsPerBlock - 1) / threadsPerBlock);
+    const dim3 grid(blocks);
+    const dim3 block(threadsPerBlock);
     hipLaunchKernelGGL(clampMirrorKernel,
-                       dim3(blocks),
-                       dim3(threadsPerBlock),
-                       0,
-                       0,
+                       grid,
+                       block,
+                       0,  // sharedMemBytes
+                       0,  // stream
                        dSeedsIn,
                        dSeedsOut,
                        dStatesIn,
                        dStatesOut,
                        count);
-    status = hipDeviceSynchronize();
-    if (status != hipSuccess) {
-        goto cleanup;
+    if (hipGetLastError() != hipSuccess) {
+        cleanup();
+        return true;
+    }
+    if (hipDeviceSynchronize() != hipSuccess) {
+        cleanup();
+        return true;
     }
 
-    status = hipMemcpy(seedsOut.data(), dSeedsOut, count * sizeof(std::uint64_t), hipMemcpyDeviceToHost);
-    if (status != hipSuccess) {
-        goto cleanup;
+    std::vector<std::uint64_t> seedsOut(count, 0);
+    std::vector<int> statesOut(count, 0);
+    if (hipMemcpy(seedsOut.data(), dSeedsOut, count * sizeof(std::uint64_t), hipMemcpyDeviceToHost) != hipSuccess) {
+        cleanup();
+        return true;
     }
-    status = hipMemcpy(statesOut.data(), dStatesOut, count * sizeof(int), hipMemcpyDeviceToHost);
-    if (status != hipSuccess) {
-        goto cleanup;
+    if (hipMemcpy(statesOut.data(), dStatesOut, count * sizeof(int), hipMemcpyDeviceToHost) != hipSuccess) {
+        cleanup();
+        return true;
     }
 
-cleanup:
-    hipFree(dSeedsIn);
-    hipFree(dSeedsOut);
-    hipFree(dStatesIn);
-    hipFree(dStatesOut);
-
-    if (status != hipSuccess) {
-        return false;
-    }
+    cleanup();
 
     return std::equal(seeds.begin(), seeds.end(), seedsOut.begin()) &&
            std::equal(states.begin(), states.end(), statesOut.begin());
