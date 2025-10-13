@@ -60,11 +60,11 @@ build CMakeFiles/clamp.dir/src/telemetry/entropy_telemetry.cpp.o: CXX_COMPILER__
   OBJECT_DIR = CMakeFiles/clamp.dir
   OBJECT_FILE_DIR = CMakeFiles/clamp.dir/src/telemetry
 
-build CMakeFiles/clamp.dir/src/telemetry/entropy_validation.cpp.o: CXX_COMPILER__clamp_unscanned_ /home/zerkol/Dev/rocforge/clamp/src/telemetry/entropy_validation.cpp || cmake_object_order_depends_target_clamp
-  DEFINES = -DUSE_PROF_API=1 -D__HIP_PLATFORM_AMD__=1
+build CMakeFiles/clamp.dir/src/telemetry/entropy_validation.cpp.o: HIP_COMPILER__clamp_unscanned_ /home/zerkol/Dev/rocforge/clamp/src/telemetry/entropy_validation.cpp || cmake_object_order_depends_target_clamp
+  DEFINES = -DUSE_PROF_API=1 -D__HIP_PLATFORM_AMD__=1 -D__HIP_ROCclr__=1
   DEP_FILE = CMakeFiles/clamp.dir/src/telemetry/entropy_validation.cpp.o.d
-  FLAGS = -std=c++20
-  INCLUDES = -I/home/zerkol/Dev/rocforge/clamp/include -isystem /opt/rocm/include -isystem /opt/rocm-6.4.4/include
+  FLAGS = -std=c++20 --offload-arch=gfx1100
+  INCLUDES = -I/home/zerkol/Dev/rocforge/clamp/include
   OBJECT_DIR = CMakeFiles/clamp.dir
   OBJECT_FILE_DIR = CMakeFiles/clamp.dir/src/telemetry
 
@@ -216,6 +216,114 @@ build clamp_aggregator_test: HIP_EXECUTABLE_LINKER__clamp_aggregator_test_ CMake
   TARGET_FILE = clamp_aggregator_test
   TARGET_PDB = clamp_aggregator_test.dbg
 
+# =============================================================================
+# Object build statements for EXECUTABLE target clamp_aggregator_extended_test
+
+
+#############################################
+# Order-only phony target for clamp_aggregator_extended_test
+
+build cmake_object_order_depends_target_clamp_aggregator_extended_test: phony || cmake_object_order_depends_target_clamp
+
+build CMakeFiles/clamp_aggregator_extended_test.dir/tests/test_aggregator_extended.cpp.o: CXX_COMPILER__clamp_aggregator_extended_test_unscanned_ /home/zerkol/Dev/rocforge/clamp/tests/test_aggregator_extended.cpp || cmake_object_order_depends_target_clamp_aggregator_extended_test
+  DEFINES = -DUSE_PROF_API=1 -D__HIP_PLATFORM_AMD__=1
+  DEP_FILE = CMakeFiles/clamp_aggregator_extended_test.dir/tests/test_aggregator_extended.cpp.o.d
+  FLAGS = -std=c++20
+  INCLUDES = -I/home/zerkol/Dev/rocforge/clamp/include -isystem /opt/rocm/include -isystem /opt/rocm-6.4.4/include
+  OBJECT_DIR = CMakeFiles/clamp_aggregator_extended_test.dir
+  OBJECT_FILE_DIR = CMakeFiles/clamp_aggregator_extended_test.dir/tests
+
+
+# =============================================================================
+# Link build statements for EXECUTABLE target clamp_aggregator_extended_test
+
+
+#############################################
+# Link the executable clamp_aggregator_extended_test
+
+build clamp_aggregator_extended_test: HIP_EXECUTABLE_LINKER__clamp_aggregator_extended_test_ CMakeFiles/clamp_aggregator_extended_test.dir/tests/test_aggregator_extended.cpp.o | libclamp.a /opt/rocm-6.4.4/lib/librocblas.so.4.4.60404 /opt/rocm/lib/libamdhip64.so.6.4.60404 /opt/rocm-6.4.4/lib/libamdhip64.so.6.4.60404 || libclamp.a
+  DEP_FILE = CMakeFiles/clamp_aggregator_extended_test.dir/link.d
+  FLAGS = --offload-arch=gfx1100
+  LINK_FLAGS = -Xlinker --dependency-file=CMakeFiles/clamp_aggregator_extended_test.dir/link.d
+  LINK_LIBRARIES = libclamp.a  /opt/rocm-6.4.4/lib/librocblas.so.4.4.60404  /opt/rocm/lib/libamdhip64.so.6.4.60404  /opt/rocm-6.4.4/lib/libamdhip64.so.6.4.60404  -lgcc  -lgcc
+  OBJECT_DIR = CMakeFiles/clamp_aggregator_extended_test.dir
+  POST_BUILD = :
+  PRE_LINK = :
+  TARGET_FILE = clamp_aggregator_extended_test
+  TARGET_PDB = clamp_aggregator_extended_test.dbg
+
+# =============================================================================
+# Object build statements for EXECUTABLE target clamp_inspect_test
+
+
+#############################################
+# Order-only phony target for clamp_inspect_test
+
+build cmake_object_order_depends_target_clamp_inspect_test: phony || cmake_object_order_depends_target_clamp
+
+build CMakeFiles/clamp_inspect_test.dir/tests/test_inspect.cpp.o: CXX_COMPILER__clamp_inspect_test_unscanned_ /home/zerkol/Dev/rocforge/clamp/tests/test_inspect.cpp || cmake_object_order_depends_target_clamp_inspect_test
+  DEFINES = -DUSE_PROF_API=1 -D__HIP_PLATFORM_AMD__=1
+  DEP_FILE = CMakeFiles/clamp_inspect_test.dir/tests/test_inspect.cpp.o.d
+  FLAGS = -std=c++20
+  INCLUDES = -I/home/zerkol/Dev/rocforge/clamp/include -isystem /opt/rocm/include -isystem /opt/rocm-6.4.4/include
+  OBJECT_DIR = CMakeFiles/clamp_inspect_test.dir
+  OBJECT_FILE_DIR = CMakeFiles/clamp_inspect_test.dir/tests
+
+
+# =============================================================================
+# Link build statements for EXECUTABLE target clamp_inspect_test
+
+
+#############################################
+# Link the executable clamp_inspect_test
+
+build clamp_inspect_test: HIP_EXECUTABLE_LINKER__clamp_inspect_test_ CMakeFiles/clamp_inspect_test.dir/tests/test_inspect.cpp.o | libclamp.a /opt/rocm-6.4.4/lib/librocblas.so.4.4.60404 /opt/rocm/lib/libamdhip64.so.6.4.60404 /opt/rocm-6.4.4/lib/libamdhip64.so.6.4.60404 || libclamp.a
+  DEP_FILE = CMakeFiles/clamp_inspect_test.dir/link.d
+  FLAGS = --offload-arch=gfx1100
+  LINK_FLAGS = -Xlinker --dependency-file=CMakeFiles/clamp_inspect_test.dir/link.d
+  LINK_LIBRARIES = libclamp.a  /opt/rocm-6.4.4/lib/librocblas.so.4.4.60404  /opt/rocm/lib/libamdhip64.so.6.4.60404  /opt/rocm-6.4.4/lib/libamdhip64.so.6.4.60404  -lgcc  -lgcc
+  OBJECT_DIR = CMakeFiles/clamp_inspect_test.dir
+  POST_BUILD = :
+  PRE_LINK = :
+  TARGET_FILE = clamp_inspect_test
+  TARGET_PDB = clamp_inspect_test.dbg
+
+# =============================================================================
+# Object build statements for EXECUTABLE target telemetry_inspect
+
+
+#############################################
+# Order-only phony target for telemetry_inspect
+
+build cmake_object_order_depends_target_telemetry_inspect: phony || cmake_object_order_depends_target_clamp
+
+build CMakeFiles/telemetry_inspect.dir/src/tools/telemetry_inspect.cpp.o: CXX_COMPILER__telemetry_inspect_unscanned_ /home/zerkol/Dev/rocforge/clamp/src/tools/telemetry_inspect.cpp || cmake_object_order_depends_target_telemetry_inspect
+  DEFINES = -DUSE_PROF_API=1 -D__HIP_PLATFORM_AMD__=1
+  DEP_FILE = CMakeFiles/telemetry_inspect.dir/src/tools/telemetry_inspect.cpp.o.d
+  FLAGS = -std=c++20
+  INCLUDES = -I/home/zerkol/Dev/rocforge/clamp/include -isystem /opt/rocm/include -isystem /opt/rocm-6.4.4/include
+  OBJECT_DIR = CMakeFiles/telemetry_inspect.dir
+  OBJECT_FILE_DIR = CMakeFiles/telemetry_inspect.dir/src/tools
+
+
+# =============================================================================
+# Link build statements for EXECUTABLE target telemetry_inspect
+
+
+#############################################
+# Link the executable telemetry_inspect
+
+build telemetry_inspect: HIP_EXECUTABLE_LINKER__telemetry_inspect_ CMakeFiles/telemetry_inspect.dir/src/tools/telemetry_inspect.cpp.o | libclamp.a /opt/rocm-6.4.4/lib/librocblas.so.4.4.60404 /opt/rocm/lib/libamdhip64.so.6.4.60404 /opt/rocm-6.4.4/lib/libamdhip64.so.6.4.60404 || libclamp.a
+  DEP_FILE = CMakeFiles/telemetry_inspect.dir/link.d
+  FLAGS = --offload-arch=gfx1100
+  LINK_FLAGS = -Xlinker --dependency-file=CMakeFiles/telemetry_inspect.dir/link.d
+  LINK_LIBRARIES = libclamp.a  /opt/rocm-6.4.4/lib/librocblas.so.4.4.60404  /opt/rocm/lib/libamdhip64.so.6.4.60404  /opt/rocm-6.4.4/lib/libamdhip64.so.6.4.60404  -lgcc  -lgcc
+  OBJECT_DIR = CMakeFiles/telemetry_inspect.dir
+  POST_BUILD = :
+  PRE_LINK = :
+  TARGET_FILE = telemetry_inspect
+  TARGET_PDB = telemetry_inspect.dbg
+
 
 #############################################
 # Utility command for test
@@ -251,6 +359,48 @@ build CMakeFiles/rebuild_cache.util: CUSTOM_COMMAND
 
 build rebuild_cache: phony CMakeFiles/rebuild_cache.util
 
+
+#############################################
+# Utility command for list_install_components
+
+build list_install_components: phony
+
+
+#############################################
+# Utility command for install
+
+build CMakeFiles/install.util: CUSTOM_COMMAND all
+  COMMAND = cd /home/zerkol/Dev/rocforge/clamp && /usr/bin/cmake -P cmake_install.cmake
+  DESC = Install the project...
+  pool = console
+  restat = 1
+
+build install: phony CMakeFiles/install.util
+
+
+#############################################
+# Utility command for install/local
+
+build CMakeFiles/install/local.util: CUSTOM_COMMAND all
+  COMMAND = cd /home/zerkol/Dev/rocforge/clamp && /usr/bin/cmake -DCMAKE_INSTALL_LOCAL_ONLY=1 -P cmake_install.cmake
+  DESC = Installing only the local directory...
+  pool = console
+  restat = 1
+
+build install/local: phony CMakeFiles/install/local.util
+
+
+#############################################
+# Utility command for install/strip
+
+build CMakeFiles/install/strip.util: CUSTOM_COMMAND all
+  COMMAND = cd /home/zerkol/Dev/rocforge/clamp && /usr/bin/cmake -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake
+  DESC = Installing the project stripped...
+  pool = console
+  restat = 1
+
+build install/strip: phony CMakeFiles/install/strip.util
+
 # =============================================================================
 # Target aliases.
 
@@ -264,7 +414,7 @@ build clamp: phony libclamp.a
 #############################################
 # Folder: /home/zerkol/Dev/rocforge/clamp
 
-build all: phony libclamp.a clamp_test clamp_scoring_test clamp_aggregator_test
+build all: phony libclamp.a clamp_test clamp_scoring_test clamp_aggregator_test clamp_aggregator_extended_test clamp_inspect_test telemetry_inspect
 
 # =============================================================================
 # Built-in targets

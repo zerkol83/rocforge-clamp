@@ -2,6 +2,13 @@
 /home/zerkol/Dev/rocforge/clamp/CMakeFiles/clamp_test.dir
 /home/zerkol/Dev/rocforge/clamp/CMakeFiles/clamp_scoring_test.dir
 /home/zerkol/Dev/rocforge/clamp/CMakeFiles/clamp_aggregator_test.dir
+/home/zerkol/Dev/rocforge/clamp/CMakeFiles/clamp_aggregator_extended_test.dir
+/home/zerkol/Dev/rocforge/clamp/CMakeFiles/clamp_inspect_test.dir
+/home/zerkol/Dev/rocforge/clamp/CMakeFiles/telemetry_inspect.dir
 /home/zerkol/Dev/rocforge/clamp/CMakeFiles/test.dir
 /home/zerkol/Dev/rocforge/clamp/CMakeFiles/edit_cache.dir
 /home/zerkol/Dev/rocforge/clamp/CMakeFiles/rebuild_cache.dir
+/home/zerkol/Dev/rocforge/clamp/CMakeFiles/list_install_components.dir
+/home/zerkol/Dev/rocforge/clamp/CMakeFiles/install.dir
+/home/zerkol/Dev/rocforge/clamp/CMakeFiles/install/local.dir
+/home/zerkol/Dev/rocforge/clamp/CMakeFiles/install/strip.dir

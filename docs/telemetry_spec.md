@@ -36,12 +36,12 @@ Future revisions will extend the schema with distributed node identifiers and pr
 
 `TemporalAggregator` consumes all session files beneath `build/telemetry/` and emits `build/telemetry_summary.json` with the following top-level fields:
 
-| Field              | Type   | Description                                                        |
-|--------------------|--------|--------------------------------------------------------------------|
-| `source_directory` | string | Directory scanned for session logs.                                |
-| `session_count`    | number | Total count of aggregated telemetry records.                       |
-| `mean_stability`   | number | Arithmetic mean of all stability scores (fixed 6 decimal places).  |
-| `stability_variance` | number | Sample variance of the stability scores.                         |
-| `drift_index`      | number | Difference between earliest and latest session timestamps (ms).    |
+| Field              | Type   | Description                                                                 |
+|--------------------|--------|-----------------------------------------------------------------------------|
+| `sourceDirectory`  | string | Absolute directory scanned for session logs (also exported as `source_directory`). |
+| `sessionCount`     | number | Total count of aggregated telemetry records (legacy alias `session_count`). |
+| `meanStability`    | number | Arithmetic mean of all stability scores, fixed to six decimal places (`mean_stability`). |
+| `variance`         | number | Sample variance of the stability scores derived from Welford running stats (`stability_variance`). |
+| `driftPercentile`  | number | 95th percentile of recorded lock durations in milliseconds (`drift_index`). |
 
-The summary file is meant for longitudinal analysis and accompanies the raw session logs in release artifacts and CI uploads.
+Legacy snake_case properties remain in the payload for backward compatibility with pre-v0.5 tooling, but downstream consumers should migrate to the camelCase equivalents introduced in Phase 2. The summary file is meant for longitudinal analysis and accompanies the raw session logs in release artifacts and CI uploads.

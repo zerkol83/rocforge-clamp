@@ -83,3 +83,38 @@ target_link_libraries(clamp_aggregator_test
 )
 
 add_test(NAME clamp_aggregator_test COMMAND clamp_aggregator_test)
+
+add_executable(clamp_aggregator_extended_test
+    tests/test_aggregator_extended.cpp
+)
+
+target_link_libraries(clamp_aggregator_extended_test
+    PRIVATE
+        clamp
+)
+
+add_test(NAME clamp_aggregator_extended_test COMMAND clamp_aggregator_extended_test)
+
+add_executable(clamp_inspect_test
+    tests/test_inspect.cpp
+)
+
+target_link_libraries(clamp_inspect_test
+    PRIVATE
+        clamp
+)
+
+add_test(NAME clamp_inspect_test COMMAND clamp_inspect_test)
+
+add_executable(telemetry_inspect
+    src/tools/telemetry_inspect.cpp
+)
+
+target_link_libraries(telemetry_inspect
+    PRIVATE
+        clamp
+)
+
+install(TARGETS telemetry_inspect
+    RUNTIME DESTINATION bin
+)

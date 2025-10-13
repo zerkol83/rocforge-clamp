@@ -1,3 +1,27 @@
+Clamp v0.6.0-dev — Diagnostics & Visualization Bridge
+=====================================================
+
+Release date: TBD  
+Status: In development  
+Tag: v0.6.0-dev
+
+Highlights
+----------
+
+- Diagnostics Bridge (Phase 3) – Added the `telemetry_inspect` CLI for summarising `build/telemetry_summary.json` and per-session logs, with ASCII bar visualisation, legacy field handling, and test coverage under `clamp_inspect_test`.
+
+Clamp v0.5.0-dev — Work In Progress
+===================================
+
+Release date: TBD  
+Status: In development  
+Tag: v0.5.0-dev
+
+Highlights
+----------
+
+- Aggregator specialization (Phase 2) – TemporalAggregator now accumulates build telemetry artifacts, computes long-term stability metrics (mean, variance, 95th percentile drift), and emits camelCase summary fields alongside legacy aliases for downstream compatibility.
+
 Clamp v0.4.0 — Distributed Temporal Scoring & Telemetry Aggregation
 ==================================================================
 

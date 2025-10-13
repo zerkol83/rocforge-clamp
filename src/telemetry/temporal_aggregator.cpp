@@ -7,6 +7,7 @@
 #include <cstring>
 #include <fstream>
 #include <iomanip>
+#include <iterator>
 #include <limits>
 #include <numeric>
 #include <sstream>
@@ -27,6 +28,8 @@ struct ParsedRecord {
     double stabilityScore{0.0};
     double durationMs{0.0};
     double timestampMs{std::numeric_limits<double>::quiet_NaN()};
+    bool hasStability{false};
+    bool hasDuration{false};
 };
 
 double parseIsoTimestampMs(const std::string& value) {
@@ -64,10 +67,30 @@ std::vector<ParsedRecord> parseJsonWithNlohmann(std::istream& stream) {
     for (const auto& entry : data["records"]) {
         ParsedRecord record;
         if (entry.contains("stability_score")) {
-            record.stabilityScore = entry["stability_score"].get<double>();
+            try {
+                if (entry["stability_score"].is_number()) {
+                    record.stabilityScore = entry["stability_score"].get<double>();
+                    record.hasStability = true;
+                } else if (entry["stability_score"].is_string()) {
+                    record.stabilityScore = std::stod(entry["stability_score"].get<std::string>());
+                    record.hasStability = true;
+                }
+            } catch (const std::exception&) {
+                record.hasStability = false;
+            }
         }
         if (entry.contains("duration_ms")) {
-            record.durationMs = entry["duration_ms"].get<double>();
+            try {
+                if (entry["duration_ms"].is_number()) {
+                    record.durationMs = entry["duration_ms"].get<double>();
+                    record.hasDuration = true;
+                } else if (entry["duration_ms"].is_string()) {
+                    record.durationMs = std::stod(entry["duration_ms"].get<std::string>());
+                    record.hasDuration = true;
+                }
+            } catch (const std::exception&) {
+                record.hasDuration = false;
+            }
         }
         if (entry.contains("acquired_at") && entry["acquired_at"].is_string()) {
             record.timestampMs = parseIsoTimestampMs(entry["acquired_at"].get<std::string>());
@@ -75,7 +98,9 @@ std::vector<ParsedRecord> parseJsonWithNlohmann(std::istream& stream) {
         if (!std::isfinite(record.timestampMs)) {
             record.timestampMs = static_cast<double>(parsed.size());
         }
-        parsed.push_back(record);
+        if (record.hasStability) {
+            parsed.push_back(record);
+        }
     }
     return parsed;
 }
@@ -109,11 +134,12 @@ std::vector<ParsedRecord> parseJsonFallback(std::istream& stream) {
                     --end;
                 }
                 auto cleaned = token.substr(begin, end - begin);
-                if (cleaned.empty() || (!std::isdigit(static_cast<unsigned char>(cleaned.front())) &&
-                                        cleaned.front() != '-' && cleaned.front() != '+')) {
-                    throw std::invalid_argument("Invalid numeric field in telemetry input: '" + token + "'");
+                try {
+                    record.stabilityScore = std::stod(cleaned);
+                    record.hasStability = true;
+                } catch (const std::exception&) {
+                    record.hasStability = false;
                 }
-                record.stabilityScore = std::stod(cleaned);
             }
         }
         keyPos = trimmed.find("\"duration_ms\"");
@@ -131,22 +157,24 @@ std::vector<ParsedRecord> parseJsonFallback(std::istream& stream) {
                     --end;
                 }
                 auto cleaned = token.substr(begin, end - begin);
-                if (cleaned.empty() || (!std::isdigit(static_cast<unsigned char>(cleaned.front())) &&
-                                        cleaned.front() != '-' && cleaned.front() != '+')) {
-                    throw std::invalid_argument("Invalid numeric field in telemetry input: '" + token + "'");
+                try {
+                    record.durationMs = std::stod(cleaned);
+                    record.hasDuration = true;
+                } catch (const std::exception&) {
+                    record.hasDuration = false;
                 }
-                record.durationMs = std::stod(cleaned);
             }
         }
         if (trimmed.find("}") != std::string::npos && inRecord) {
             inRecord = false;
             record.timestampMs = static_cast<double>(parsed.size());
-            parsed.push_back(record);
+            if (record.hasStability) {
+                parsed.push_back(record);
+            }
         }
     }
     return parsed;
 }
-
 std::vector<ParsedRecord> parseTelemetryFile(const std::filesystem::path& path) {
     std::ifstream in(path);
     if (!in.is_open()) {
@@ -161,6 +189,9 @@ std::vector<ParsedRecord> parseTelemetryFile(const std::filesystem::path& path) 
 
 struct RunningStats {
     void add(double value) {
+        if (!std::isfinite(value)) {
+            return;
+        }
         ++count;
         const double delta = value - mean;
         mean += delta / static_cast<double>(count);
@@ -185,13 +216,33 @@ std::string summaryToJson(const TemporalAggregator::Summary& summary,
     std::ostringstream oss;
     oss << std::fixed << std::setprecision(6);
     oss << "{";
+    oss << "\"sourceDirectory\":\"" << sourceDirectory << "\",";
     oss << "\"source_directory\":\"" << sourceDirectory << "\",";
+    oss << "\"sessionCount\":" << summary.sessionCount << ",";
+    oss << "\"meanStability\":" << summary.meanStability << ",";
+    oss << "\"variance\":" << summary.variance << ",";
+    oss << "\"driftPercentile\":" << summary.driftPercentile << ",";
     oss << "\"session_count\":" << summary.sessionCount << ",";
     oss << "\"mean_stability\":" << summary.meanStability << ",";
     oss << "\"stability_variance\":" << summary.stabilityVariance << ",";
     oss << "\"drift_index\":" << summary.driftIndex;
     oss << "}";
     return oss.str();
+}
+
+double computePercentile(std::vector<double>& values, double percentile) {
+    if (values.empty()) {
+        return 0.0;
+    }
+    const double clamped = std::clamp(percentile, 0.0, 1.0);
+    if (values.size() == 1) {
+        return values.front();
+    }
+    const double scaledIndex = clamped * static_cast<double>(values.size() - 1);
+    const auto index = static_cast<std::size_t>(std::floor(scaledIndex));
+    auto nth = values.begin() + static_cast<std::ptrdiff_t>(index);
+    std::nth_element(values.begin(), nth, values.end());
+    return *nth;
 }
 
 } // namespace
@@ -203,45 +254,141 @@ TemporalAggregator::Summary TemporalAggregator::aggregate(const std::filesystem:
     }
 
     RunningStats stats;
-    double minTimestamp = std::numeric_limits<double>::infinity();
-    double maxTimestamp = -std::numeric_limits<double>::infinity();
-    double sequentialIndex = 0.0;
+    std::vector<double> durations;
+    durations.reserve(64);
 
     for (const auto& entry : std::filesystem::directory_iterator(telemetryDir)) {
         if (!entry.is_regular_file()) {
             continue;
         }
+        if (entry.path().extension() != ".json") {
+            continue;
+        }
 
-        const auto records = parseTelemetryFile(entry.path());
+        std::vector<ParsedRecord> records;
+        try {
+            records = parseTelemetryFile(entry.path());
+        } catch (const std::exception&) {
+            continue;
+        }
+
         for (const auto& record : records) {
-            stats.add(record.stabilityScore);
-
-            double timestamp = record.timestampMs;
-            if (!std::isfinite(timestamp)) {
-                timestamp = sequentialIndex;
+            if (!record.hasStability || !std::isfinite(record.stabilityScore)) {
+                continue;
             }
-
-            minTimestamp = std::min(minTimestamp, timestamp);
-            maxTimestamp = std::max(maxTimestamp, timestamp);
-            sequentialIndex += 1.0;
+            stats.add(record.stabilityScore);
+            if (record.hasDuration && std::isfinite(record.durationMs) && record.durationMs >= 0.0) {
+                durations.push_back(record.durationMs);
+            }
         }
     }
 
     summary.sessionCount = stats.count;
-    if (stats.count == 0) {
-        summary.meanStability = 0.0;
-        summary.stabilityVariance = 0.0;
-        summary.driftIndex = 0.0;
-        return summary;
-    }
-
     summary.meanStability = stats.mean;
-    summary.stabilityVariance = stats.variance();
-    summary.driftIndex = (stats.count > 1 && std::isfinite(minTimestamp) && std::isfinite(maxTimestamp))
-                            ? (maxTimestamp - minTimestamp)
-                            : 0.0;
+    summary.variance = stats.variance();
+    summary.stabilityVariance = summary.variance;
+    summary.driftPercentile = computePercentile(durations, 0.95);
+    summary.driftIndex = summary.driftPercentile;
 
     return summary;
+}
+
+TemporalAggregator::Summary TemporalAggregator::accumulate(const std::filesystem::path& workspaceRoot) {
+    const auto telemetryDir = workspaceRoot / "build" / "telemetry";
+    Summary summary = aggregate(telemetryDir);
+    const auto summaryPath = workspaceRoot / "build" / "telemetry_summary.json";
+    writeSummary(summary, summaryPath, telemetryDir.string());
+    return summary;
+}
+
+TemporalAggregator::Summary TemporalAggregator::loadSummary(const std::filesystem::path& summaryPath) const {
+    Summary summary;
+    std::ifstream in(summaryPath);
+    if (!in.is_open()) {
+        return summary;
+    }
+    std::string json((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    auto readValue = [&json](const std::string& key, double& out) {
+        const auto keyPos = json.find(key);
+        if (keyPos == std::string::npos) {
+            return;
+        }
+        const auto colon = json.find(':', keyPos);
+        if (colon == std::string::npos) {
+            return;
+        }
+        const auto end = json.find_first_of(",}", colon + 1);
+        const std::string token = json.substr(colon + 1, end != std::string::npos ? end - colon - 1 : std::string::npos);
+        try {
+            out = std::stod(token);
+        } catch (...) {
+        }
+    };
+    readValue("\"meanStability\"", summary.meanStability);
+    if (summary.meanStability == 0.0) {
+        readValue("\"mean_stability\"", summary.meanStability);
+    }
+    readValue("\"variance\"", summary.variance);
+    if (summary.variance == 0.0) {
+        readValue("\"stability_variance\"", summary.variance);
+    }
+    summary.stabilityVariance = summary.variance;
+    readValue("\"driftPercentile\"", summary.driftPercentile);
+    if (summary.driftPercentile == 0.0) {
+        readValue("\"drift_index\"", summary.driftPercentile);
+    }
+    summary.driftIndex = summary.driftPercentile;
+    double sessionCount = 0.0;
+    readValue("\"sessionCount\"", sessionCount);
+    if (sessionCount == 0.0) {
+        readValue("\"session_count\"", sessionCount);
+    }
+    summary.sessionCount = static_cast<std::size_t>(sessionCount);
+    return summary;
+}
+
+std::vector<TemporalAggregator::SessionDetail> TemporalAggregator::loadSessions(const std::filesystem::path& telemetryDir) const {
+    std::vector<SessionDetail> sessions;
+    if (!std::filesystem::exists(telemetryDir)) {
+        return sessions;
+    }
+    for (const auto& entry : std::filesystem::directory_iterator(telemetryDir)) {
+        if (!entry.is_regular_file() || entry.path().extension() != ".json") {
+            continue;
+        }
+        Summary summary;
+        RunningStats stats;
+        std::vector<double> durations;
+        durations.reserve(16);
+        std::vector<ParsedRecord> records;
+        try {
+            records = parseTelemetryFile(entry.path());
+        } catch (const std::exception&) {
+            continue;
+        }
+        for (const auto& record : records) {
+            if (!record.hasStability || !std::isfinite(record.stabilityScore)) {
+                continue;
+            }
+            stats.add(record.stabilityScore);
+            if (record.hasDuration && std::isfinite(record.durationMs) && record.durationMs >= 0.0) {
+                durations.push_back(record.durationMs);
+            }
+        }
+        if (stats.count == 0) {
+            continue;
+        }
+        summary.sessionCount = stats.count;
+        summary.meanStability = stats.mean;
+        summary.variance = stats.variance();
+        summary.stabilityVariance = summary.variance;
+        summary.driftPercentile = computePercentile(durations, 0.95);
+        summary.driftIndex = summary.driftPercentile;
+        sessions.push_back(SessionDetail{entry.path().filename(), summary});
+    }
+    std::sort(sessions.begin(), sessions.end(),
+              [](const SessionDetail& lhs, const SessionDetail& rhs) { return lhs.source < rhs.source; });
+    return sessions;
 }
 
 bool TemporalAggregator::writeSummary(const Summary& summary,

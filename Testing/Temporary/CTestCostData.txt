@@ -1,6 +1,6 @@
-clamp_test 6 0.000572066
-clamp_scoring_test 0 0
-clamp_aggregator_test 0 0
+clamp_test 12 0.00224599
+clamp_scoring_test 6 0.0035714
+clamp_aggregator_test 6 0.0036581
+clamp_aggregator_extended_test 6 0.00380114
+clamp_inspect_test 2 0.0437587
 ---
-clamp_scoring_test
-clamp_aggregator_test
