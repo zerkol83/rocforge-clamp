@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 
+import os
+
 import requests
 import yaml
 
@@ -20,6 +22,18 @@ HEADERS = {
     "Accept": "application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json",
     "User-Agent": "ROCForge-CI-Update/1.0",
 }
+
+
+def ghcr_auth():
+    """Return an authentication tuple for GHCR if credentials are available."""
+    user = os.getenv("GHCR_USER")
+    token = os.getenv("GHCR_TOKEN") or os.getenv("GITHUB_TOKEN")
+    if token:
+        if not user:
+            # GHCR accepts any non-empty username when using PATs; keep compatibility with GITHUB_TOKEN.
+            user = "token"
+        return (user, token)
+    return None
 
 
 @dataclass
@@ -67,7 +81,8 @@ def existing_entries(matrix: Dict) -> Dict[Tuple[str, str], Dict]:
 
 def fetch_tags(prefix: Optional[str] = None) -> Iterable[str]:
     params = {"n": "200"}
-    response = requests.get(GHCR_TAGS_URL, headers=HEADERS, params=params, timeout=30)
+    auth = ghcr_auth()
+    response = requests.get(GHCR_TAGS_URL, headers=HEADERS, params=params, timeout=30, auth=auth)
     response.raise_for_status()
     payload = response.json()
     tags = payload.get("tags", [])
@@ -94,7 +109,8 @@ def parse_tag(tag: str) -> Optional[Tuple[str, str]]:
 
 def pull_digest(tag: str) -> Optional[str]:
     manifest_url = f"https://ghcr.io/v2/{REPOSITORY}/manifests/{tag}"
-    response = requests.head(manifest_url, headers=HEADERS, timeout=30)
+    auth = ghcr_auth()
+    response = requests.head(manifest_url, headers=HEADERS, timeout=30, auth=auth)
     if response.status_code == 404:
         return None
     response.raise_for_status()

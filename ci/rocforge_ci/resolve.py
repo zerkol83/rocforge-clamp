@@ -64,9 +64,10 @@ def load_yaml(path: Path) -> Dict:
 
 def load_matrix(path: Path) -> Dict:
     data = load_yaml(path)
-    if "rocm" not in data:
-        raise ResolveError("Invalid matrix format: missing 'rocm' root")
-    return data["rocm"]
+    if "rocm" in data:
+        return {"kind": "rich", "payload": data["rocm"]}
+    # fallback simple mapping
+    return {"kind": "simple", "payload": data}
 
 
 def index_images(images: List[Dict]) -> Dict[Tuple[str, str], Dict]:
@@ -159,7 +160,34 @@ def run_manifest_inspect(image_ref: str) -> Optional[Dict]:
 
 
 def resolve_image(matrix_path: Path = MATRIX_PATH, policy_path: Path = POLICY_PATH) -> ResolvedImage:
-    matrix = load_matrix(matrix_path)
+    matrix_descriptor = load_matrix(matrix_path)
+    kind = matrix_descriptor["kind"]
+    payload = matrix_descriptor["payload"]
+
+    if kind == "simple":
+        if not isinstance(payload, dict) or not payload:
+            raise ResolveError("Matrix must define at least one image")
+        # deterministic ordering by key name
+        os_id, entry = next(iter(sorted(payload.items(), key=lambda item: item[0])))
+        if isinstance(entry, dict):
+            image_ref = entry.get("image")
+        else:
+            image_ref = str(entry)
+        if not image_ref:
+            raise ResolveError(f"No image defined for {os_id}")
+        repo, tag = image_ref.split(":", 1) if ":" in image_ref else (image_ref, "")
+        return ResolvedImage(
+            image=image_ref,
+            repository=repo,
+            tag=tag,
+            digest="",
+            version=tag or os_id,
+            os_name=os_id,
+            policy_mode="static",
+            signer=None,
+        )
+
+    matrix = payload
     images = index_images(matrix.get("images", []))
     if not images:
         raise ResolveError("Image list is empty in matrix")

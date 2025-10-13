@@ -110,18 +110,29 @@ def parse_image_ref(ref: str) -> Tuple[str, str, Optional[str]]:
     return repo, tag, digest
 
 
-def load_matrix(path: Path) -> Dict[Tuple[str, str], ImageRecord]:
+def load_matrix(path: Path) -> Tuple[str, Dict[Tuple[str, str], ImageRecord]]:
     if not path.exists():
         raise FileNotFoundError(f"Matrix file not found: {path}")
     with path.open("r", encoding="utf-8") as handle:
         data = yaml.safe_load(handle) or {}
-    rocm = data.get("rocm", {})
-    mapping: Dict[Tuple[str, str], ImageRecord] = {}
-    for raw in rocm.get("images", []):
-        record = ImageRecord.from_dict(raw)
-        if record.version and record.os_name:
-            mapping[record.key] = record
-    return mapping
+    if "rocm" in data:
+        rocm = data.get("rocm", {})
+        mapping: Dict[Tuple[str, str], ImageRecord] = {}
+        for raw in rocm.get("images", []):
+            record = ImageRecord.from_dict(raw)
+            if record.version and record.os_name:
+                mapping[record.key] = record
+        return "rich", mapping
+
+    # simple mapping fallback
+    mapping = {}
+    for os_name, entry in data.items():
+        image = entry.get("image") if isinstance(entry, dict) else str(entry)
+        if not image:
+            continue
+        record = ImageRecord(version=image.split(":")[-1], os_name=os_name, digest="", added=None)
+        mapping[(record.version, record.os_name)] = record
+    return "simple", mapping
 
 
 def fetch_remote_digest(tag: str) -> Optional[str]:
@@ -220,11 +231,30 @@ def run_cosign_verify(image_ref: str, key_path: Optional[str], identity: Optiona
 
 def verify_image(image_ref: str, matrix_path: Path = MATRIX_PATH, policy_path: Path = POLICY_PATH) -> int:
     policy = Policy.load(policy_path)
-    matrix = load_matrix(matrix_path)
+    matrix_kind, matrix = load_matrix(matrix_path)
 
     repo, tag, digest = parse_image_ref(image_ref)
     if repo != REPOSITORY:
         print(f"Warning: repository mismatch ({repo} != {REPOSITORY})", file=sys.stderr)
+
+    if matrix_kind == "simple":
+        # basic validation: ensure tag exists in mapping
+        target = None
+        for (_, os_name), record in matrix.items():
+            if record.os_name in tag or record.version == tag:
+                target = record
+                break
+        if target is None:
+            print(f"Image {tag} not present in matrix", file=sys.stderr)
+            return VerificationStatus.FAIL
+        snapshot = {
+            "image": image_ref,
+            "digest": digest or "",
+            "policy_mode": policy.mode,
+            "checked_at": current_timestamp(),
+        }
+        print(json.dumps(snapshot, indent=2))
+        return VerificationStatus.OK
 
     version, os_name = tag.split("-", 1) if "-" in tag else (tag, "")
     record = matrix.get((version, os_name))

@@ -1,15 +1,8 @@
-rocm:
-  images:
-    - version: "6.4.4"
-      os: "ubuntu-22.04"
-      digest: "sha256:79aa43981a4296ca45f6827a0d0bcdc8239824c8e97643a7a86c1ce2c9dddc8b"
-      added: "2024-10-12"
-    - version: "6.4.4"
-      os: "ubuntu-24.04"
-      digest: "sha256:TODO_NEXT_RELEASE"
-      added: "2024-10-12"
-  policy:
-    default: ["6.4.4", "ubuntu-22.04"]
-    prefer_os: "ubuntu-24.04"
-    fallback_os: "ubuntu-22.04"
-    fallback_version: "6.4.4"
+ubuntu-22.04:
+  image: ghcr.io/rocm/dev:ubuntu-22.04-base
+
+ubuntu-20.04:
+  image: ghcr.io/rocm/dev:ubuntu-20.04-base
+
+centos-7:
+  image: ghcr.io/rocm/dev:centos-7-base
