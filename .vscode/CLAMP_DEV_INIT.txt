@@ -1,0 +1,104 @@
+# Clamp Secure Secrets Subsystem — Development Context Prompt
+
+Context:
+Clamp is a self-healing ROCm CI environment manager. It verifies container digests, provenance signatures, and now includes a secure secret-handling subsystem introduced in Phase 5-A.
+
+Objective:
+Implement a fully automated secrets lifecycle that bootstraps safely, validates syntax, encrypts credentials, enforces filesystem permissions, and injects decrypted values into runtime variables. Clamp must never expose plaintext secrets or rely on user-supplied permissions.
+
+──────────────────────────────
+🔒 Secure Boot Sequence
+──────────────────────────────
+1️⃣ Program launch:
+   • Clamp checks for an encrypted secrets manifest (`~/.config/clamp/secrets.md`).
+   • If missing → generates a template manifest and a new encryption key (`~/.config/clamp/secrets.key`).
+
+2️⃣ User edit phase:
+   • User edits the plaintext template to insert credentials (GHCR_TOKEN, COSIGN key, etc.).
+   • Clamp validates syntax (YAML schema, required entries, non-empty credentials).
+
+3️⃣ Encryption phase:
+   • On validation pass, Clamp encrypts sensitive values with AES-GCM via Fernet.
+   • Plaintext is replaced with `ENC[...]` blocks; manifest gets an HMAC signature.
+   • Plaintext template is securely deleted.
+
+4️⃣ Acceptance guard:
+   • Clamp refuses to “accept” a secrets file until it passes:
+        - Schema validation
+        - HMAC signature verification
+        - Expiry timestamp check
+        - Required-field presence
+        - Format sanity (no malformed entries)
+   • Failing any check → Clamp logs reason, falls back to unauthenticated mode.
+
+5️⃣ Runtime variable injection:
+   • At startup, decrypted secrets are loaded only into memory.
+   • Environment variables like:
+        GHCR_USER, GHCR_TOKEN, COSIGN_KEY
+     are set in-process.
+   • No decrypted data is written to disk or echoed to logs.
+
+──────────────────────────────
+🗜️ Directory & Permission Enforcement
+──────────────────────────────
+Paths:
+  ~/.config/clamp/
+      ├── secrets.key        (0600)
+      ├── secrets.md         (0600)
+      └── state/             (0700)
+
+Automatic Enforcement:
+  • `mkdir -p ~/.config/clamp` → chmod 0700
+  • key and manifest files → chmod 0600
+  • before decrypting, validate that neither group nor other have access bits
+  • insecure permissions raise `PermissionError` unless CLAMP_PERMISSIONS_STRICT=0
+
+CI-Mode Handling:
+  • On ephemeral CI (GitHub Actions, containers), permissions may not persist.
+  • In that case, Clamp logs a warning and continues with reduced checks if:
+        CLAMP_PERMISSIONS_STRICT=0
+
+Audit Logs:
+  [Clamp] 🔒 Ensured 0700 perms on ~/.config/clamp
+  [Clamp] 🔒 Ensured 0600 perms on secrets.key
+  [Clamp] ✅ Permissions verified — proceeding to decrypt secrets.md
+
+──────────────────────────────
+🧩 Ignoring Secrets (Fail-Safe)
+──────────────────────────────
+Global override: `CLAMP_IGNORE_SECRETS=1`
+  • Skips decryption and GHCR auth entirely.
+  • Logs a warning and sets telemetry flag:
+        "authMode": "unauthenticated", "reason": "CLAMP_IGNORE_SECRETS"
+
+──────────────────────────────
+🧠 Developer Commands
+──────────────────────────────
+`clamp secrets init`     → generate key + template
+`clamp secrets encrypt`  → validate + encrypt manifest
+`clamp secrets rotate`   → re-encrypt with new credentials
+`clamp secrets show`     → decrypt single entry in-memory
+`clamp secrets verify`   → run all pre-acceptance checks manually
+
+──────────────────────────────
+✅ Expected Behaviour Summary
+──────────────────────────────
+• Secrets folder and files always secure by default.
+• Syntax errors abort encryption, never overwrite a valid manifest.
+• Clamp refuses to run with insecure permissions.
+• Decrypted variables live only in process memory.
+• Manual override (`CLAMP_IGNORE_SECRETS`) provides recovery mode.
+• Telemetry always records whether secrets were active or ignored.
+
+──────────────────────────────
+LLM Guidance
+──────────────────────────────
+When generating or modifying code in VS Code:
+• Always respect this lifecycle and permission model.
+• Never output raw credentials or example tokens.
+• Assume the encryption layer uses Python `cryptography.fernet`.
+• Assume all filesystem interactions must call `setup_permissions()` before reads/writes.
+• When writing tests, simulate both encrypted and ignored modes.
+
+Purpose:
+Keep the Clamp engine self-contained, reproducible, and secure even in misconfigured or degraded CI environments.

@@ -17,6 +17,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Clean workspace safely
+        run: |
+          set -euo pipefail
+          echo "Container image: $(cat /etc/os-release | grep PRETTY_NAME)"
+          git fetch origin main --prune
+          git reset --hard FETCH_HEAD
+          git clean -ffdX
+          echo "HEAD: $(git rev-parse HEAD)"
+
+
       - name: Cache ROCm toolchain
         uses: actions/cache@v4
         with:

@@ -28,7 +28,7 @@ jobs:
       - name: Update ROCm matrix
         id: update
         run: |
-          python ci/update_rocm_matrix.py --os ubuntu-22.04 | tee update.log
+          python -m rocforge_ci update --os ubuntu-22.04 | tee update.log
           if git diff --quiet ci/rocm_matrix.yml; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else

@@ -5,33 +5,18 @@ The Phase 3 diagnostics bridge overlays lightweight inspection tooling on top of
 ## Interpreting Key Metrics
 
 - **Mean Stability** (`meanStability`) – arithmetic average of per-record `stability_score`. Values near 1.0 imply consistent lock behaviour; sustained drops highlight regression candidates.
-- **Variance** (`variance`) – sample variance derived with Welford running statistics. Rising variance signals widening spread across runs even if the mean remains stable.
-- **Drift Percentile** (`driftPercentile`) – 95th percentile of recorded `duration_ms`. This is the practical “tail latency” for lock retention: an increase indicates longer stalls or contention windows. Legacy consumers may still reference `drift_index` (numeric match).
-- **Session Count** (`sessionCount`) – total telemetry records covered by the summary. Behavior changes should be evaluated against comparable sample sizes.
+- **Variance** (`stabilityVariance`) – sample variance derived with Welford running statistics. Rising variance signals widening spread across runs even if the mean remains stable.
+- **Drift Index** (`driftIndex`) – Difference between earliest and latest session timestamps. This approximates long-tail spread across telemetry runs.
+- **Session Count** (`sessionCount`) – Total telemetry records covered by the summary. Behavior changes should be evaluated against comparable sample sizes.
 
-When monitoring trends, track both the mean and variance: a stable mean with climbing variance is often the first sign of intermittent instability. Drift percentiles help distinguish between isolated spikes and systemic regressions by anchoring measurements to the long tail.
+When monitoring trends, track both the mean and variance: a stable mean with climbing variance is often the first sign of intermittent instability. Drift index helps distinguish between isolated spikes and systemic regressions by anchoring measurements to the long tail.
 
-## telemetry_inspect Usage
+## Diagnostics Bridge
 
-From the project root (after building with Ninja):
+The Phase 4 split removes the standalone `telemetry_inspect` CLI. Diagnostics and parity reporting will return as part of the ROCForge-CI bridge (`python -m rocforge_ci ...`) once visualization work lands in Phase 7. Until then, telemetry summaries can be inspected with `jq` or any JSON tooling:
 
 ```bash
-./telemetry_inspect            # Aggregate table plus per-session breakdown
-./telemetry_inspect --summary  # Aggregate table only
-./telemetry_inspect --sessions # Per-session view only
-./telemetry_inspect --compare build/telemetry_summary_*.json  # Backend parity report + JSON export
+jq '.mean_stability, .stability_variance, .drift_index, .session_count, .build_info' build/telemetry_summary.json
 ```
 
-The per-session output renders ASCII bars scaled to the maximum observed values. `#` characters mark relative magnitude, while `(p95=…)` displays the exact drift percentile for each session file.
-
-`--compare` loads one or more summary artifacts (glob-friendly) and prints a parity table with backend/device labels, mean deltas, drift skew, and variance ratios. The most stable backend is annotated with an upward arrow (`↑`), while regressions are marked with `↓`. Drift deltas that exceed ±5 ms carry a trailing `*`, mirroring the `telemetry_comparison.json` summary emitted to `build/`.
-
-Example session snippet:
-
-```
-session_a.json mean=0.8125 count=8
-  mean  ######################......
-  drift ##########.................. (p95=12.50)
-```
-
-Use the camelCase metrics in new tooling; snake_case aliases remain in the JSON for backward compatibility.
+CamelCase and snake_case aliases remain in the JSON for backward compatibility.

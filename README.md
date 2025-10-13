@@ -32,9 +32,8 @@ The default build links against HIP and rocBLAS, enabling the optional HIP entro
 - JSON snapshots provide machine-readable feeds for ROCForge telemetry ingestion and can be serialised to `/tmp/clamp_telemetry` or a user-specified path.
 - HIP mirroring validates that entropy seeds and state flags observed on the host are consistent on AMD GPUs.
 - `TemporalScoring` consumes telemetry snapshots to produce normalized reproducibility scores (0.0–1.0), entropy variance, duration variance, and drift measurements. Results can be exported as JSON or human-readable summaries for dashboards and CI artifacts.
-- `TemporalAggregator` consolidates telemetry logs under `build/telemetry/`, computes cross-run statistics, and emits `telemetry_summary.json` exposing `meanStability`, `variance`, `driftPercentile`, `sessionCount`, and backend/device attribution (with legacy snake_case aliases) for versioned reproducibility reporting.
-- `telemetry_inspect` provides aggregate and per-session views, while `--compare` produces backend parity tables with deltas/variance ratios and writes `telemetry_comparison.json` for automated reporting.
-- ROCm container provenance is validated via Sigstore/cosign; verification results and trust status are recorded in `rocm_provenance.json`, surfaced in telemetry summaries, and detailed in `docs/ci_integrity_spec.md`.
+- `TemporalAggregator` consolidates telemetry logs under `build/telemetry/`, computes cross-run statistics, and emits `telemetry_summary.json` exposing `mean_stability`, `stability_variance`, `drift_index`, and `session_count`, plus `build_info` copied from the CI-generated `rocm_snapshot.json`.
+- ROCm container provenance is resolved and verified by the external ROCForge-CI toolchain; Clamp only records the immutable snapshot in its telemetry summaries. Details live in `docs/ci_integrity_spec.md` and `docs/runtime_isolation.md`.
 
 ### ROCm Toolchain Setup
 Ensure HIP and rocBLAS are discoverable by CMake:
@@ -46,5 +45,16 @@ cmake --build build
 ctest --output-on-failure --test-dir build
 ```
 Adjust `/opt/rocm` if ROCm is installed elsewhere.
+
+## Runtime vs CI Responsibility
+
+| Layer        | Responsibilities                                                         |
+|--------------|---------------------------------------------------------------------------|
+| Clamp runtime | HIP validation kernels, entropy telemetry capture, temporal aggregation. |
+| ROCForge-CI  | Container resolution, digest/policy verification, provenance generation. |
+
+Clamp consumes the immutable snapshot produced by ROCForge-CI (`rocm_snapshot.json`) but
+performs no network or registry access at runtime. See `docs/runtime_isolation.md` for the
+full rationale and integration notes.
 
 See `docs/technical_overview.md` for an in-depth discussion of the entropy lifecycle, temporal alignment algorithms, ROCm dependency graph, and stability metrics captured during the v0.4 validation campaign. The telemetry schema and reproducibility guarantees are defined in `docs/telemetry_spec.md`. The container resolver, digest verification pipeline, and update workflows are documented in `docs/ci_integrity_spec.md`.

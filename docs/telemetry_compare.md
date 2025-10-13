@@ -1,6 +1,11 @@
-# Clamp Telemetry Comparison (Phase 4)
+# Clamp Telemetry Comparison (Legacy Reference)
 
-Phase 4 introduces comparative profiling so that CPU, HIP, and future Instinct backends can be evaluated side-by-side. The comparison layer consumes the backend-aware summaries produced during aggregation and emits a consolidated parity report for dashboards or CI triage.
+> **Note:** Comparative profiling now belongs to the ROCForge-CI pipeline. Clamp
+> no longer ships the `telemetry_inspect` CLI or backend-aware summaries. This
+> document is retained for historical context and future work inside
+> `rocforge_ci`.
+
+Phase 4 originally introduced comparative profiling so that CPU, HIP, and future Instinct backends could be evaluated side-by-side. The comparison layer consumed backend-aware summaries and emitted a consolidated parity report for dashboards or CI triage.
 
 ## Metrics
 

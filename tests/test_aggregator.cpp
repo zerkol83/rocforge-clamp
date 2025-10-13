@@ -48,8 +48,22 @@ int main() {
     assert(summary.stabilityVariance >= 0.0);
     assert(summary.driftIndex >= 0.0);
 
+    const auto buildDir = std::filesystem::current_path() / "build";
+    std::filesystem::create_directories(buildDir);
+    const auto snapshotPath = buildDir / "rocm_snapshot.json";
+    {
+        std::ofstream snapshot(snapshotPath);
+        snapshot << R"({
+  "image": "ghcr.io/rocm/dev:test@sha256:1234",
+  "digest": "sha256:1234",
+  "resolved_at": "2024-01-01T00:00:00Z",
+  "policy_mode": "strict",
+  "signer": "rocforge-ci"
+})";
+    }
+
     const auto outputPath = std::filesystem::current_path() / "telemetry_summary.json";
-    assert(aggregator.writeSummary(summary, outputPath, baseDir.string()));
+    assert(aggregator.writeSummary(summary, outputPath, baseDir.string(), snapshotPath));
     assert(std::filesystem::exists(outputPath));
 
     std::ifstream in(outputPath);
@@ -59,6 +73,8 @@ int main() {
     assert(contents.find("\"session_count\"") != std::string::npos);
     assert(contents.find("\"mean_stability\"") != std::string::npos);
     assert(contents.find("\"drift_index\"") != std::string::npos);
+    assert(contents.find("\"build_info\"") != std::string::npos);
+    assert(contents.find("rocforge-ci") != std::string::npos);
 
     return 0;
 }

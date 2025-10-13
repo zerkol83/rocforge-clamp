@@ -1,0 +1,1 @@
+"chat.contextFiles": [".vscode/CLAMP_DEV_INIT.txt"]

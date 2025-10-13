@@ -8,16 +8,16 @@ This document describes how Clamp validates and maintains the ROCm container mat
 |-----------|---------|
 | `ci/rocm_matrix.yml` | Canonical catalog of ROCm container images (version, OS, digest, discovery date). |
 | `ci/rocm_policy.yml` | Enforcement policy (strict / warn / auto_update), digest TTL, signature requirements (`require_signature`), and attestation handling (`attest_mode`). |
-| `ci/resolve_rocm.py` | Selects the preferred container according to policy ordering and emits a digest-qualified reference. |
-| `ci/verify_rocm_digest.py` | Validates the selected image’s digest against GHCR and the recorded matrix value. |
-| `ci/update_rocm_matrix.py` | Discovers new ROCm tags and records their digests for review. |
+| `ci/rocforge_ci/resolve.py` (`python -m rocforge_ci resolve`) | Selects the preferred container according to policy ordering, emits a digest-qualified reference, and writes `rocm_snapshot.json`. |
+| `ci/rocforge_ci/verify.py` (`python -m rocforge_ci verify`) | Validates the selected image’s digest against GHCR and the recorded matrix value. |
+| `ci/rocforge_ci/update.py` (`python -m rocforge_ci update`) | Discovers new ROCm tags and records their digests for review. |
 | `.github/workflows/update-rocm.yml` | Weekly automation that runs the updater script and opens a PR with refreshed matrix data. |
 
 ## Resolver → Verifier Flow
 
-1. **Resolver** reads the matrix and policy to determine the ordering of candidate tags (preferred OS, default fallback).
+1. **Resolver** (`python -m rocforge_ci resolve`) reads the matrix and policy to determine the ordering of candidate tags (preferred OS, default fallback) and persists a snapshot.
 2. The resolver inspects GHCR manifests and emits `ghcr.io/rocm/dev:<version>-<os>@<digest>` as a step output.
-3. **Verifier** consumes this reference, loads `ci/rocm_policy.yml`, and performs three checks:
+3. **Verifier** (`python -m rocforge_ci verify`) consumes this reference, loads `ci/rocm_policy.yml`, and performs three checks:
    - The recorded digest in `ci/rocm_matrix.yml` must match both the resolver digest and the current GHCR manifest digest (`Docker-Content-Digest`).
    - The digest age (derived from `added`) must be less than the configured TTL (days).
    - On mismatch, behaviour depends on policy mode:
@@ -37,12 +37,12 @@ Exit codes: `0 = OK`, `1 = warning`, `2 = failure`. The CI step wraps the script
 
 ```
           ┌────────────────────┐
-          │  clamp-ci resolve  │
+          │  rocforge-ci resolve │
           └─────────┬──────────┘
                     │ image@digest
                     ▼
           ┌────────────────────┐
-          │  verify_rocm_digest│
+          │  rocforge-ci verify│
           └─────────┬──────────┘
             match    │   drift/ttl breach
             (OK)     │
@@ -62,22 +62,15 @@ Exit codes: `0 = OK`, `1 = warning`, `2 = failure`. The CI step wraps the script
 
 When `on_mismatch: auto_update` (policy mode `auto_update`) is active, any digest drift automatically dispatches `.github/workflows/update-rocm.yml` using the CI token. The workflow creates or updates the “Auto-update ROCm matrix” PR with refreshed digests, closing the loop without manual intervention. Strict/warn modes behave as before.
 
-### Sample `rocm_provenance.json`
+### Sample `rocm_snapshot.json`
 
 ```json
 {
   "image": "ghcr.io/rocm/dev:6.4.4-ubuntu-22.04@sha256:79aa4398…",
-  "policyMode": "strict",
-  "requireSignature": true,
-  "attestMode": "record",
-  "provenance": {
-    "status": "verified",
-    "issuer": "sigstore",
-    "timestamp": "2025-01-01T00:00:00Z",
-    "digestAlgorithm": "sha256",
-    "policyDecision": "mode=strict|require_sig=true|attest=record|status=0",
-    "trustStatus": "valid"
-  }
+  "digest": "sha256:79aa4398…",
+  "resolved_at": "2025-01-01T00:00:00Z",
+  "policy_mode": "strict",
+  "signer": "sigstore/rocforge-ci"
 }
 ```
 

@@ -1,4 +1,4 @@
-# Clamp Telemetry & Stability Architecture (v0.4)
+# Clamp Telemetry & Stability Architecture (v0.5)
 
 ## Entropy Lifecycle
 - **Seed Generation**: `EntropyTracker` combines a steady clock tick with the executing thread identifier to produce deterministic-yet-unique entropy seeds.
@@ -21,12 +21,12 @@
 - **Entropy Deviation**: Seeds collected across threads are compared for drift and collision detection.
 - **State Fidelity**: Transition logs ensure anchors never bypass expected `Unlocked → Locked → Released → Unlocked` progressions.
 - **Temporal Reproducibility Score**: `TemporalScoring` produces a normalized 0.0–1.0 index by combining entropy variance, duration variance, and drift components, providing a quantitative definition of stability across sequential and parallel workloads.
-- **Aggregate Stability Summary**: `TemporalAggregator` merges multiple session logs into `telemetry_summary.json`, reporting `meanStability`, `variance`, `driftPercentile`, `sessionCount`, and the dominant backend/device pairing (with legacy snake_case mirrors) for longitudinal analysis.
+- **Aggregate Stability Summary**: `TemporalAggregator` merges multiple session logs into `telemetry_summary.json`, reporting `mean_stability`, `stability_variance`, `drift_index`, and `session_count`, while copying the CI-supplied `build_info` snapshot for provenance metadata.
 
 ## Experimental Protocol
 1. Execute the standard validation loop (`ctest --output-on-failure`) to produce telemetry snapshots.
 2. Inspect the generated JSON (via `EntropyTelemetry::writeJSON` or `toJson`) to confirm deterministic seeds, durations, and aligned timestamps.
-3. Aggregate all telemetry logs using `TemporalAggregator` to create `telemetry_summary.json`, capturing mean/variance/drift metrics and backend/device attribution across runs (camelCase plus legacy aliases).
+3. Aggregate all telemetry logs using `TemporalAggregator` to create `telemetry_summary.json`, capturing mean/variance/drift metrics alongside the immutable `build_info` copied from `rocm_snapshot.json`.
 4. Compute stability indices with `TemporalScoring::evaluate` or `evaluateAggregated`, capturing JSON summaries for dashboards.
 5. Review HIP mirror status (available through test assertions) to ensure GPU coherence.
 6. Archive telemetry outputs alongside ROCForge’s global entropy field data for composite system analysis.

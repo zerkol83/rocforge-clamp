@@ -3,7 +3,6 @@
 #include <cstddef>
 #include <filesystem>
 #include <string>
-#include <vector>
 
 namespace clamp {
 
@@ -11,33 +10,19 @@ class TemporalAggregator {
 public:
     struct Summary {
         double meanStability{0.0};
-        double variance{0.0};
-        double driftPercentile{0.0};
-        std::size_t sessionCount{0};
         double stabilityVariance{0.0};
         double driftIndex{0.0};
-        std::string backend;
-        std::string deviceName;
-        std::string trustStatus{"unknown"};
-        std::string provenanceIssuer{"unknown"};
-        std::string provenanceTimestamp;
-        std::string digestAlgorithm{"sha256"};
-        std::string policyDecision;
-    };
-
-    struct SessionDetail {
-        std::filesystem::path source;
-        Summary metrics;
+        std::size_t sessionCount{0};
     };
 
     TemporalAggregator() = default;
+
     Summary aggregate(const std::filesystem::path& telemetryDir);
-    Summary accumulate(const std::filesystem::path& workspaceRoot);
-    Summary loadSummary(const std::filesystem::path& summaryPath) const;
-    std::vector<SessionDetail> loadSessions(const std::filesystem::path& telemetryDir) const;
+
     bool writeSummary(const Summary& summary,
                       const std::filesystem::path& outputPath,
-                      const std::string& sourceDirectory) const;
+                      const std::string& sourceDirectory,
+                      const std::filesystem::path& snapshotPath = {}) const;
 };
 
 } // namespace clamp

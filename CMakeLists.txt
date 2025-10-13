@@ -17,8 +17,6 @@ endif()
 find_package(HIP REQUIRED)
 enable_language(HIP)
 find_package(rocblas REQUIRED)
-find_package(Python3 COMPONENTS Interpreter REQUIRED)
-
 add_library(clamp STATIC
     src/clamp.cpp
     src/telemetry/entropy_telemetry.cpp
@@ -26,7 +24,6 @@ add_library(clamp STATIC
     src/telemetry/entropy_validation.hip
     src/scoring/TemporalScoring.cpp
     src/telemetry/temporal_aggregator.cpp
-    src/telemetry/telemetry_compare.cpp
 )
 
 set_source_files_properties(
@@ -40,6 +37,11 @@ set_source_files_properties(
     PROPERTIES
         LANGUAGE HIP
 )
+
+set(ROCM_SNAPSHOT_JSON "" CACHE STRING "Path to resolved ROCm snapshot metadata")
+if(ROCM_SNAPSHOT_JSON)
+    target_compile_definitions(clamp PRIVATE CLAMP_ROCM_SNAPSHOT_JSON="${ROCM_SNAPSHOT_JSON}")
+endif()
 
 target_include_directories(clamp
     PUBLIC
@@ -85,54 +87,3 @@ target_link_libraries(clamp_aggregator_test
 )
 
 add_test(NAME clamp_aggregator_test COMMAND clamp_aggregator_test)
-
-add_executable(clamp_aggregator_extended_test
-    tests/test_aggregator_extended.cpp
-)
-
-target_link_libraries(clamp_aggregator_extended_test
-    PRIVATE
-        clamp
-)
-
-add_test(NAME clamp_aggregator_extended_test COMMAND clamp_aggregator_extended_test)
-
-add_executable(clamp_inspect_test
-    tests/test_inspect.cpp
-)
-
-target_link_libraries(clamp_inspect_test
-    PRIVATE
-        clamp
-)
-
-add_test(NAME clamp_inspect_test COMMAND clamp_inspect_test)
-
-add_executable(clamp_compare_test
-    tests/test_compare.cpp
-)
-
-target_link_libraries(clamp_compare_test
-    PRIVATE
-        clamp
-)
-
-add_test(NAME clamp_compare_test COMMAND clamp_compare_test)
-
-add_test(NAME clamp_phase4_end2end
-    COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tests/test_phase4_end2end.py
-    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-)
-
-add_executable(telemetry_inspect
-    src/tools/telemetry_inspect.cpp
-)
-
-target_link_libraries(telemetry_inspect
-    PRIVATE
-        clamp
-)
-
-install(TARGETS telemetry_inspect
-    RUNTIME DESTINATION bin
-)

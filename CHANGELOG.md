@@ -1,41 +1,18 @@
-Clamp v0.7.0-dev — Comparative Profiling & Backend Parity
-=========================================================
+Clamp v0.5.0 — Runtime Isolation & ROCForge-CI Split
+===================================================
 
-Release date: TBD  
-Status: In development  
-Tag: v0.7.0-dev
-
-Highlights
-----------
-
-- Comparative profiling (Phase 4) – Telemetry instrumentation now tags every record and summary with backend/device metadata, enabling cross-target analysis.
-- Added `telemetry_inspect --compare` for side-by-side stability/drift/variance reporting with parity arrows and drift significance markers, writing `telemetry_comparison.json` for downstream dashboards.
-- Introduced `TelemetryComparator` core utility and regression tests covering mean deltas, drift skew, and variance ratios across CPU vs HIP summaries.
-- ROCm container integrity checks now enforce digest verification via `ci/verify_rocm_digest.py`, honoring `ci/rocm_policy.yml` (strict/warn/auto-update) and documenting the flow in `docs/ci_integrity_spec.md`.
-
-Clamp v0.6.0-dev — Diagnostics & Visualization Bridge
-=====================================================
-
-Release date: TBD  
-Status: In development  
-Tag: v0.6.0-dev
+Release date: 2025-??-??  
+Status: Pending validation under Debian 13 + ROCm 6.4.4  
+Tag: v0.5.0
 
 Highlights
 ----------
 
-- Diagnostics Bridge (Phase 3) – Added the `telemetry_inspect` CLI for summarising `build/telemetry_summary.json` and per-session logs, with ASCII bar visualisation, legacy field handling, and test coverage under `clamp_inspect_test`.
+- **Runtime isolation** – Clamp no longer performs network calls or GHCR policy checks. All provenance logic lives in the new `rocforge-ci` Python toolkit (`python -m rocforge_ci resolve|verify|update`).
+- **Snapshot-driven aggregation** – `TemporalAggregator` now records only `mean_stability`, `stability_variance`, `drift_index`, and `session_count`, copying CI-generated metadata under `build_info` without verifying it.
+- **CI redesign** – `.github/workflows/clamp-ci.yml` resolves digests via `rocforge-ci`, stores `build/rocm_snapshot.json`, and passes `-DROCM_SNAPSHOT_JSON` to Clamp’s CMake configuration. Legacy scripts are thin shims around the package.
+- **Documentation refresh** – Added `docs/runtime_isolation.md` and updated `docs/ci_integrity_spec.md`, `docs/telemetry_spec.md`, and the README with the runtime vs CI responsibility split.
 
-Clamp v0.5.0-dev — Work In Progress
-===================================
-
-Release date: TBD  
-Status: In development  
-Tag: v0.5.0-dev
-
-Highlights
-----------
-
-- Aggregator specialization (Phase 2) – TemporalAggregator now accumulates build telemetry artifacts, computes long-term stability metrics (mean, variance, 95th percentile drift), and emits camelCase summary fields alongside legacy aliases for downstream compatibility.
 
 Clamp v0.4.0 — Distributed Temporal Scoring & Telemetry Aggregation
 ==================================================================

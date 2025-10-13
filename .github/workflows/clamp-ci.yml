@@ -11,6 +11,7 @@ jobs:
     outputs:
       image: ${{ steps.resolve.outputs.image }}
       digest_status: ${{ steps.verify.outputs.status }}
+      snapshot_b64: ${{ steps.resolve.outputs.snapshot_b64 }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,8 +23,11 @@ jobs:
       - name: Resolve ROCm container
         id: resolve
         run: |
-          image=$(python3 ci/resolve_rocm.py)
+          mkdir -p build
+          image=$(python3 -m rocforge_ci resolve --matrix ci/rocm_matrix.yml --policy ci/rocm_policy.yml --output build/rocm_snapshot.json)
           echo "image=$image" >> "$GITHUB_OUTPUT"
+          snapshot_b64=$(base64 -w0 build/rocm_snapshot.json)
+          echo "snapshot_b64=$snapshot_b64" >> "$GITHUB_OUTPUT"
 
       - name: Verify ROCm digest
         id: verify
@@ -32,7 +36,7 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           status="ok"
-          python3 ci/verify_rocm_digest.py "${{ steps.resolve.outputs.image }}"
+          python3 -m rocforge_ci verify "${{ steps.resolve.outputs.image }}"
           rc=$?
           if [ $rc -eq 1 ]; then
             echo "::warning::ROCm digest drift detected (policy warn)."
@@ -69,10 +73,15 @@ jobs:
           apt-get update
           apt-get install -y cmake ninja-build g++ python3 jq
 
+      - name: Restore snapshot metadata
+        run: |
+          mkdir -p build
+          printf '%s' "${{ needs.resolve-image.outputs.snapshot_b64 }}" | base64 -d > build/rocm_snapshot.json
+
       - name: Configure
         run: |
           export PATH=/opt/rocm/bin:$PATH
-          cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=/opt/rocm
+          cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=/opt/rocm -DROCM_SNAPSHOT_JSON=build/rocm_snapshot.json
 
       - name: Build
         run: |
@@ -91,7 +100,7 @@ jobs:
       - name: Configure Clamp
         run: |
           export PATH=/opt/rocm/bin:$PATH
-          cmake -S clamp -B build -G Ninja -DCMAKE_PREFIX_PATH=/opt/rocm
+          cmake -S clamp -B build -G Ninja -DCMAKE_PREFIX_PATH=/opt/rocm -DROCM_SNAPSHOT_JSON=build/rocm_snapshot.json
 
       - name: Build Clamp
         run: |
