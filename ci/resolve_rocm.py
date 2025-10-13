@@ -122,8 +122,8 @@ def run_manifest_inspect(image_ref: str) -> Optional[Dict]:
     return {"digest": digest}
 
 
-def resolve_image() -> str:
-    matrix = load_matrix(MATRIX_PATH)
+def resolve_image(matrix_path: Path = MATRIX_PATH) -> str:
+    matrix = load_matrix(matrix_path)
 
     images = index_images(matrix.get("images", []))
     if not images:
@@ -170,11 +170,8 @@ def main() -> int:
     parser.add_argument("--matrix", type=Path, default=MATRIX_PATH, help="Path to the ROCm matrix YAML")
     args = parser.parse_args()
 
-    global MATRIX_PATH
-    MATRIX_PATH = args.matrix
-
     try:
-        image = resolve_image()
+        image = resolve_image(args.matrix)
         print(image)
     except ResolveError as exc:
         print(f"Error: {exc}", file=sys.stderr)
