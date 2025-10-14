@@ -38,8 +38,19 @@ jobs:
           apt-get update
           apt-get install -y cmake ninja-build g++ python3
 
+      - name: Install Python dependencies
+        run: |
+          python3 -m pip install --user PyYAML requests
+
+      - name: Show cached CI mode
+        run: python3 -m rocforge_ci mode show
+
+      - name: Smart bootstrap
+        run: |
+          python3 -m rocforge_ci smart-bootstrap
+
       - name: Configure
-        run: cmake -S . -B build -G Ninja
+        run: cmake -S . -B build -G Ninja -DROCM_SNAPSHOT_JSON=build/rocm_snapshot.json
 
       - name: Build
         run: cmake --build build
@@ -50,7 +61,7 @@ jobs:
       - name: Configure Clamp
         run: |
           export PATH=/opt/rocm/bin:$PATH
-          cmake -S clamp -B build -G Ninja -DCMAKE_PREFIX_PATH=/opt/rocm
+          cmake -S clamp -B build -G Ninja -DCMAKE_PREFIX_PATH=/opt/rocm -DROCM_SNAPSHOT_JSON=build/rocm_snapshot.json
 
       - name: Build Clamp
         run: |
@@ -65,6 +76,10 @@ jobs:
           else
             ctest --test-dir build --output-on-failure
           fi
+
+      - name: Reset CI mode marker
+        if: always()
+        run: python3 -m rocforge_ci mode reset
 
       - name: Archive Telemetry
         if: matrix.config == 'parallel'

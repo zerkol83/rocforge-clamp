@@ -25,12 +25,24 @@ jobs:
           echo "rocblas_DIR=/opt/rocm/rocblas/lib/cmake/rocblas" >> $GITHUB_ENV
           export PATH=/opt/rocm/bin:$PATH
 
+      - name: Install Python dependencies
+        run: |
+          python3 -m pip install --user PyYAML requests
+
+      - name: Show cached CI mode
+        run: python3 -m rocforge_ci mode show
+
+      - name: Smart bootstrap
+        run: |
+          python3 -m rocforge_ci smart-bootstrap
+
       - name: Configure with CMake
         run: |
           cmake -B build -G Ninja \
             -DHIP_DIR=$HIP_DIR \
             -Drocblas_DIR=$rocblas_DIR \
-            -DCMAKE_PREFIX_PATH="/opt/rocm"
+            -DCMAKE_PREFIX_PATH="/opt/rocm" \
+            -DROCM_SNAPSHOT_JSON=build/rocm_snapshot.json
 
       - name: Build Clamp
         run: cmake --build build --config Release
@@ -48,6 +60,10 @@ jobs:
           else
             echo "No telemetry data exported."
           fi
+
+      - name: Reset CI mode marker
+        if: always()
+        run: python3 -m rocforge_ci mode reset
 
       - name: Upload build artifacts
         if: always()

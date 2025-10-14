@@ -57,4 +57,42 @@ Clamp consumes the immutable snapshot produced by ROCForge-CI (`rocm_snapshot.js
 performs no network or registry access at runtime. See `docs/runtime_isolation.md` for the
 full rationale and integration notes.
 
+### Offline CI Bootstrap
+In restricted environments without GHCR access, use the fallback matrix and offline flow:
+
+```bash
+python3 -m rocforge_ci smart-bootstrap        # auto-detect online vs offline mode
+python3 -m rocforge_ci offline-bootstrap    # validates ci/rocm_matrix.yml without network
+bash scripts/ci_offline_bootstrap.sh        # convenience wrapper (optional)
+python3 -m rocforge_ci diagnostics          # prints environment/DNS/auth status
+python3 -m rocforge_ci diagnostics --json   # machine-readable diagnostics
+python3 -m rocforge_ci diagnostics --ci     # concise CI log line
+```
+
+Dynamic updates (`python3 -m rocforge_ci update …`) should only be run once GHCR access is restored.
+
+Per-command overrides:
+
+```bash
+python3 -m rocforge_ci resolve --auto        # choose mode based on diagnostics
+python3 -m rocforge_ci resolve --offline     # force fallback, skip manifest checks
+python3 -m rocforge_ci verify --auto IMAGE   # verify build snapshot when online
+python3 -m rocforge_ci update --auto --os ubuntu-22.04
+```
+
+rocforge_ci records the last active mode in `.ci_mode`; if a run switches between offline and online, a warning is emitted (`⚠️ Detected mode change …`) to help spot flapping credentials or network issues.
+Use the helper commands to inspect or clear the marker between runs:
+
+```bash
+python3 -m rocforge_ci mode show   # prints {"mode": "...", "timestamp": "..."}
+python3 -m rocforge_ci mode reset  # removes the marker after CI completion
+```
+
+Each invocation of `smart-bootstrap` emits a one-line JSON summary indicating the mode,
+timestamp, and snapshot path—ideal for structured CI logs:
+
+```json
+{"mode": "offline", "snapshot": "build/rocm_snapshot.json", "timestamp": "2024-07-15T08:32:11Z"}
+```
+
 See `docs/technical_overview.md` for an in-depth discussion of the entropy lifecycle, temporal alignment algorithms, ROCm dependency graph, and stability metrics captured during the v0.4 validation campaign. The telemetry schema and reproducibility guarantees are defined in `docs/telemetry_spec.md`. The container resolver, digest verification pipeline, and update workflows are documented in `docs/ci_integrity_spec.md`.

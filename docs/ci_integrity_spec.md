@@ -66,6 +66,8 @@ When `on_mismatch: auto_update` (policy mode `auto_update`) is active, any diges
 
 ```json
 {
+  "mode": "online",
+  "timestamp": "2025-01-01T00:00:00Z",
   "image": "ghcr.io/rocm/dev:6.4.4-ubuntu-22.04@sha256:79aa4398…",
   "digest": "sha256:79aa4398…",
   "resolved_at": "2025-01-01T00:00:00Z",
@@ -78,6 +80,34 @@ When `on_mismatch: auto_update` (policy mode `auto_update`) is active, any diges
 
 - **clamp-ci**: resolves the container, verifies digest integrity, and only schedules build jobs when the policy passes. Warnings are surfaced in the log but do not block unless the policy is `strict`.
 - **update-rocm**: runs on a schedule; when the verifier detects digest drift and policy is `auto_update`, it dispatches this workflow via the GitHub API.
+
+### Offline Bootstrap Mode
+
+When GHCR access is unavailable, run:
+
+```bash
+python3 -m rocforge_ci offline-bootstrap
+```
+
+This command validates `ci/rocm_matrix.yml` with pinned base images and performs no
+network calls. The helper script `scripts/ci_offline_bootstrap.sh` wraps the same flow.
+Dynamic resolution (`python3 -m rocforge_ci resolve|verify|update`) can be re-enabled
+once GHCR credentials are configured.
+
+### Smart Bootstrap & Auto Flags
+
+- `python3 -m rocforge_ci smart-bootstrap` runs diagnostics, attempts a live update if
+  GHCR responds (HTTP 200/401), otherwise drops into offline mode automatically.
+- `python3 -m rocforge_ci resolve|verify|update --auto` chooses between live/offline
+  behavior per-invocation.
+- `--offline` can be passed explicitly to force fallback mode.
+- Mode changes are persisted in `.ci_mode`; rocforge_ci emits `⚠️ Detected mode change…`
+  when the recorded mode differs from the current run.
+- `python3 -m rocforge_ci mode show` emits the last recorded mode as JSON for CI log
+  consumption; `python3 -m rocforge_ci mode reset` clears the marker after a workflow
+  completes.
+- `python3 -m rocforge_ci diagnostics --ci` prints a condensed single-line status record
+  for GHCR reachability checks.
 
 ## Future Enhancements
 

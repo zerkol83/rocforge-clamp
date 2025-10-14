@@ -20,23 +20,26 @@ jobs:
         run: |
           python3 -m pip install --user PyYAML requests
 
-      - name: Resolve ROCm container
-        id: resolve
-        run: |
-          mkdir -p build
-          image=$(python3 -m rocforge_ci resolve --matrix ci/rocm_matrix.yml --policy ci/rocm_policy.yml --output build/rocm_snapshot.json)
-          echo "image=$image" >> "$GITHUB_OUTPUT"
-          snapshot_b64=$(base64 -w0 build/rocm_snapshot.json)
-          echo "snapshot_b64=$snapshot_b64" >> "$GITHUB_OUTPUT"
+      - name: Show cached CI mode
+        run: python3 -m rocforge_ci mode show
 
-      - name: Verify ROCm digest
-        id: verify
+      - name: Smart bootstrap
+        id: resolve
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
+          python3 -m rocforge_ci smart-bootstrap
+          image=$(python3 - <<'PY'
+import json
+print(json.load(open("build/rocm_snapshot.json"))["image"])
+PY
+)
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          snapshot_b64=$(base64 -w0 build/rocm_snapshot.json)
+          echo "snapshot_b64=$snapshot_b64" >> "$GITHUB_OUTPUT"
           status="ok"
-          python3 -m rocforge_ci verify "${{ steps.resolve.outputs.image }}"
+          python3 -m rocforge_ci verify --auto "$image"
           rc=$?
           if [ $rc -eq 1 ]; then
             echo "::warning::ROCm digest drift detected (policy warn)."
@@ -48,6 +51,10 @@ jobs:
             exit 1
           fi
           echo "status=$status" >> "$GITHUB_OUTPUT"
+
+      - name: Reset CI mode marker
+        if: always()
+        run: python3 -m rocforge_ci mode reset
 
   rocm-build:
     needs: resolve-image

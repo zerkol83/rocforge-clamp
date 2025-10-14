@@ -17,6 +17,8 @@ from typing import Dict, List, Optional, Tuple
 
 import yaml
 
+from .diagnostics import collect_diagnostics
+
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 MATRIX_PATH = PACKAGE_ROOT / "rocm_matrix.yml"
 POLICY_PATH = PACKAGE_ROOT / "rocm_policy.yml"
@@ -38,9 +40,12 @@ class ResolvedImage:
     policy_mode: str
     signer: Optional[str]
 
-    def snapshot(self) -> Dict[str, str]:
-        timestamp = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    def snapshot(self, *, mode: str, timestamp: str | None = None) -> Dict[str, str]:
+        if not timestamp:
+            timestamp = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
         data = {
+            "mode": mode,
+            "timestamp": timestamp,
             "image": self.image,
             "repository": self.repository,
             "tag": self.tag,
@@ -159,7 +164,11 @@ def run_manifest_inspect(image_ref: str) -> Optional[Dict]:
     return {"digest": digest}
 
 
-def resolve_image(matrix_path: Path = MATRIX_PATH, policy_path: Path = POLICY_PATH) -> ResolvedImage:
+def resolve_image(
+    matrix_path: Path = MATRIX_PATH,
+    policy_path: Path = POLICY_PATH,
+    offline: bool = False,
+) -> ResolvedImage:
     matrix_descriptor = load_matrix(matrix_path)
     kind = matrix_descriptor["kind"]
     payload = matrix_descriptor["payload"]
@@ -211,29 +220,33 @@ def resolve_image(matrix_path: Path = MATRIX_PATH, policy_path: Path = POLICY_PA
 
         tag = f"{version}-{os_id}"
         ref = f"{REPOSITORY}:{tag}"
-        manifest = run_manifest_inspect(ref)
-        if manifest is None:
-            if first_error is None:
-                first_error = f"Manifest inspection failed for {ref}"
-            continue
 
-        digest = str(entry.get("digest", "")).strip()
-        if digest and digest.startswith("sha256:") and not digest.endswith("TODO_NEXT_RELEASE"):
-            resolved_digest = digest
+        if offline:
+            resolved_digest = str(entry.get("digest", "")).strip()
         else:
-            resolved_digest = manifest.get("digest")
+            manifest = run_manifest_inspect(ref)
+            if manifest is None:
+                if first_error is None:
+                    first_error = f"Manifest inspection failed for {ref}"
+                continue
 
-        if not resolved_digest:
-            if first_error is None:
-                first_error = f"Digest unavailable for {ref}"
-            continue
+            digest = str(entry.get("digest", "")).strip()
+            if digest and digest.startswith("sha256:") and not digest.endswith("TODO_NEXT_RELEASE"):
+                resolved_digest = digest
+            else:
+                resolved_digest = manifest.get("digest")
+
+            if not resolved_digest:
+                if first_error is None:
+                    first_error = f"Digest unavailable for {ref}"
+                continue
 
         signer = None
         provenance = entry.get("provenance")
         if isinstance(provenance, dict):
             signer = provenance.get("signer")
 
-        image_ref = f"{ref}@{resolved_digest}"
+        image_ref = f"{ref}@{resolved_digest}" if resolved_digest else ref
         return ResolvedImage(
             image=image_ref,
             repository=REPOSITORY,
@@ -253,18 +266,34 @@ def cli(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--matrix", type=Path, default=MATRIX_PATH, help="Path to the ROCm matrix YAML")
     parser.add_argument("--policy", type=Path, default=POLICY_PATH, help="Path to the ROCm policy YAML")
     parser.add_argument("--output", type=Path, default=None, help="Optional path to write snapshot metadata")
+    parser.add_argument("--offline", action="store_true", help="Force offline resolution without GHCR calls")
+    parser.add_argument("--auto", action="store_true", help="Choose online/offline mode automatically")
     args = parser.parse_args(argv)
 
+    if args.offline and args.auto:
+        parser.error("--offline and --auto are mutually exclusive")
+
+    use_offline = args.offline
+    if args.auto:
+        diag = collect_diagnostics()
+        http_code = diag.get("auth", {}).get("http_code")
+        use_offline = http_code not in (200, 401)
+        mode = "offline" if use_offline else "online"
+        print(f"[resolve] auto mode selected {mode} (auth_code={http_code})")
+
     try:
-        resolved = resolve_image(args.matrix, args.policy)
+        resolved = resolve_image(args.matrix, args.policy, offline=use_offline)
     except ResolveError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
 
+    mode_label = "offline" if use_offline else "online"
+
     if args.output:
+        snapshot_timestamp = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
         args.output.parent.mkdir(parents=True, exist_ok=True)
         with args.output.open("w", encoding="utf-8") as handle:
-            json.dump(resolved.snapshot(), handle, indent=2, sort_keys=True)
+            json.dump(resolved.snapshot(mode=mode_label, timestamp=snapshot_timestamp), handle, indent=2, sort_keys=True)
             handle.write("\n")
 
     print(resolved.image)

@@ -14,6 +14,8 @@ import os
 import requests
 import yaml
 
+from .diagnostics import collect_diagnostics
+
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 MATRIX_PATH = PACKAGE_ROOT / "rocm_matrix.yml"
 REPOSITORY = "rocm/dev"
@@ -158,7 +160,24 @@ def cli(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Update ROCm matrix with new GHCR tags")
     parser.add_argument("--matrix", type=Path, default=MATRIX_PATH, help="Path to the ROCm matrix YAML")
     parser.add_argument("--os", dest="target_os", default="ubuntu-22.04", help="Target OS suffix to track")
+    parser.add_argument("--offline", action="store_true", help="Skip GHCR queries and leave matrix untouched")
+    parser.add_argument("--auto", action="store_true", help="Choose online/offline mode automatically")
     args = parser.parse_args(argv)
+
+    if args.offline and args.auto:
+        parser.error("--offline and --auto are mutually exclusive")
+
+    use_offline = args.offline
+    if args.auto:
+        diag = collect_diagnostics()
+        http_code = diag.get("auth", {}).get("http_code")
+        use_offline = http_code not in (200, 401)
+        mode = "offline" if use_offline else "online"
+        print(f"[update] auto mode selected {mode} (auth_code={http_code})")
+
+    if use_offline:
+        print("Offline mode: skipping GHCR update; using existing matrix.")
+        return 0
 
     try:
         added = update_matrix(args.matrix, args.target_os)

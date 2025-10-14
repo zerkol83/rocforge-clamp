@@ -17,6 +17,8 @@ from typing import Dict, Optional, Tuple
 import requests
 import yaml
 
+from .diagnostics import collect_diagnostics
+
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 MATRIX_PATH = PACKAGE_ROOT / "rocm_matrix.yml"
 POLICY_PATH = PACKAGE_ROOT / "rocm_policy.yml"
@@ -229,7 +231,12 @@ def run_cosign_verify(image_ref: str, key_path: Optional[str], identity: Optiona
     return {"status": VerificationStatus.OK, "details": payload}
 
 
-def verify_image(image_ref: str, matrix_path: Path = MATRIX_PATH, policy_path: Path = POLICY_PATH) -> int:
+def verify_image(
+    image_ref: str,
+    matrix_path: Path = MATRIX_PATH,
+    policy_path: Path = POLICY_PATH,
+    offline: bool = False,
+) -> int:
     policy = Policy.load(policy_path)
     matrix_kind, matrix = load_matrix(matrix_path)
 
@@ -266,6 +273,17 @@ def verify_image(image_ref: str, matrix_path: Path = MATRIX_PATH, policy_path: P
     if digest and digest != expected_digest:
         print(f"Digest mismatch: {digest} != {expected_digest}", file=sys.stderr)
         return VerificationStatus.FAIL
+
+    if offline:
+        snapshot = {
+            "image": image_ref,
+            "digest": digest or expected_digest,
+            "policy_mode": policy.mode,
+            "checked_at": current_timestamp(),
+            "mode": "offline",
+        }
+        print(json.dumps(snapshot, indent=2))
+        return VerificationStatus.OK
 
     remote_digest = fetch_remote_digest(tag)
     if remote_digest and remote_digest != expected_digest:
@@ -307,9 +325,22 @@ def cli(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("image", help="Resolved ROCm image reference (with digest)")
     parser.add_argument("--matrix", type=Path, default=MATRIX_PATH, help="Path to the ROCm matrix YAML")
     parser.add_argument("--policy", type=Path, default=POLICY_PATH, help="Path to the ROCm policy YAML")
+    parser.add_argument("--offline", action="store_true", help="Skip remote GHCR checks")
+    parser.add_argument("--auto", action="store_true", help="Choose online/offline verification automatically")
     args = parser.parse_args(argv)
 
-    status = verify_image(args.image, args.matrix, args.policy)
+    if args.offline and args.auto:
+        parser.error("--offline and --auto are mutually exclusive")
+
+    use_offline = args.offline
+    if args.auto:
+        diag = collect_diagnostics()
+        http_code = diag.get("auth", {}).get("http_code")
+        use_offline = http_code not in (200, 401)
+        mode = "offline" if use_offline else "online"
+        print(f"[verify] auto mode selected {mode} (auth_code={http_code})")
+
+    status = verify_image(args.image, args.matrix, args.policy, offline=use_offline)
     return status
 
 

@@ -1,0 +1,8 @@
+ubuntu-22.04:
+  image: ghcr.io/rocm/dev:ubuntu-22.04-base
+
+ubuntu-20.04:
+  image: ghcr.io/rocm/dev:ubuntu-20.04-base
+
+centos-7:
+  image: ghcr.io/rocm/dev:centos-7-base

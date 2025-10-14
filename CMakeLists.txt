@@ -17,6 +17,7 @@ endif()
 find_package(HIP REQUIRED)
 enable_language(HIP)
 find_package(rocblas REQUIRED)
+find_package(Python3 COMPONENTS Interpreter)
 add_library(clamp STATIC
     src/clamp.cpp
     src/telemetry/entropy_telemetry.cpp
@@ -87,3 +88,12 @@ target_link_libraries(clamp_aggregator_test
 )
 
 add_test(NAME clamp_aggregator_test COMMAND clamp_aggregator_test)
+
+if(Python3_Interpreter_FOUND)
+    add_test(
+        NAME rocforge_ci_mode_tests
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/ci/tests/test_ci_mode.py
+    )
+else()
+    message(WARNING "Python3 interpreter not found; skipping rocforge_ci mode tests.")
+endif()
