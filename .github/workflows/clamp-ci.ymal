@@ -1,4 +1,3 @@
-cat > .github/workflows/clamp-ci.yml <<'EOF'
 name: Clamp CI
 on:
   push:
