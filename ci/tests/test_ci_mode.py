@@ -64,6 +64,11 @@ class CiModeTests(unittest.TestCase):
         self.assertEqual(payload["mode"], "offline")
         self.assertIn("timestamp", payload)
         self.assertEqual(payload["timestamp"], payload["resolved_at"])
+        run_path = Path("build/run.json")
+        self.assertTrue(run_path.exists())
+        run_payload = json.loads(run_path.read_text())
+        self.assertEqual(run_payload["mode"], "offline")
+        self.assertEqual(run_payload["verify_status"], "skipped")
 
     def test_smart_bootstrap_online_records_mode(self):
         resolved = ResolvedImage(
@@ -95,6 +100,9 @@ class CiModeTests(unittest.TestCase):
         self.assertEqual(record["mode"], "local")
         self.assertEqual(record["snapshot"], "build/rocm_snapshot.json")
         self.assertIn("timestamp", record)
+        run_payload = json.loads(Path("build/run.json").read_text())
+        self.assertEqual(run_payload["mode"], "local")
+        self.assertEqual(run_payload["verify_status"], "skipped")
 
     def test_mode_show_and_reset(self):
         CI_MODE_FILE.write_text(json.dumps({"mode": "offline", "timestamp": "2024-01-01T00:00:00Z"}) + "\n")

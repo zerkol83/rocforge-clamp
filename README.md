@@ -57,6 +57,72 @@ Clamp consumes the immutable snapshot produced by ROCForge-CI (`rocm_snapshot.js
 performs no network or registry access at runtime. See `docs/runtime_isolation.md` for the
 full rationale and integration notes.
 
+## Clamp (SNAPI) — capture, restore, verify
+
+Clamp now bundles a lightweight Python SNAPI runtime that exposes three core commands:
+`clamp.capture`, `clamp.restore`, and `clamp.verify`. Artifacts land in `build/clamp/` by
+default, giving both developers and CI a consistent place to pull manifests and shell
+exports from.
+
+### Developer quickstart
+1. Capture the current ROCm environment (defaults to `/opt/rocm`):
+   ```bash
+   python3 - <<'PY'
+from engine import bootstrap_extensions
+from snapi import dispatch
+
+bootstrap_extensions()
+result = dispatch('clamp.capture', {'output_dir': 'build/clamp'})
+print(result['message'])
+print('manifest:', result['manifest_path'])
+print('env script:', result['env_path'])
+PY
+   ```
+2. Source the generated environment before building locally:
+   ```bash
+   source build/clamp/env.sh
+   cmake -S . -B build -G Ninja
+   cmake --build build
+   ```
+3. Verify that the live system still matches the captured manifest:
+   ```bash
+   python3 - <<'PY'
+from engine import bootstrap_extensions
+from snapi import dispatch
+
+bootstrap_extensions()
+result = dispatch('clamp.verify', {'manifest_path': 'build/clamp/manifest.json'})
+print(result['status'], result['message'])
+if result.get('mismatches'):
+    print('mismatches:', result['mismatches'])
+PY
+   ```
+
+`clamp.restore` returns both the shell snippet (`shell_hint`) and a key/value map for
+programmatic consumers that need to inject variables without sourcing `env.sh`.
+
+### RocFoundry CLI
+After `pip install -e .`, the `rocfoundry` command exposes the same Clamp flows via
+`snapi.dispatch` under the hood:
+
+```bash
+rocfoundry clamp capture /opt/rocm --output build/clamp
+rocfoundry clamp verify build/clamp/manifest.json
+eval "$(rocfoundry clamp restore build/clamp/manifest.json --apply)"
+```
+
+Use `--json` for machine-readable output, `--lenient` to treat verification mismatches
+as warnings, and `rocfoundry clamp show build/clamp/manifest.json --summary` to inspect
+the captured metadata without editing JSON manually.
+
+### CI integration snapshot
+- `python3 -m rocforge_ci smart-bootstrap` now prints whether a Clamp manifest was found
+  and records the verification outcome.
+- Successful runs emit `build/run.json` with `mode`, `clamp_manifest_path`, and
+  `verify_status` so downstream jobs can audit how the environment was prepared.
+- `ci/rocm_matrix.yml` accepts an optional `clamp_manifest` field for documentation; the
+  CI prefers the live manifest when present.
+
 ### Offline CI Bootstrap
 In restricted environments without GHCR access, use the fallback matrix and offline flow:
 

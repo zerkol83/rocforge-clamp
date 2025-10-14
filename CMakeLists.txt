@@ -94,6 +94,14 @@ if(Python3_Interpreter_FOUND)
         NAME rocforge_ci_mode_tests
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/ci/tests/test_ci_mode.py
     )
+    add_test(
+        NAME clamp_snapi_tests
+        COMMAND ${Python3_EXECUTABLE} -m unittest discover -s ${CMAKE_SOURCE_DIR}/tests/clamp -p "test_*.py"
+    )
+    add_test(
+        NAME clamp_cli_tests
+        COMMAND ${Python3_EXECUTABLE} -m unittest discover -s ${CMAKE_SOURCE_DIR}/tests/cli -p "test_*.py"
+    )
 else()
     message(WARNING "Python3 interpreter not found; skipping rocforge_ci mode tests.")
 endif()

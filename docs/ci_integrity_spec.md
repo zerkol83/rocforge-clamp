@@ -12,6 +12,18 @@ This document describes how Clamp validates and maintains the ROCm container mat
 | `ci/rocforge_ci/verify.py` (`python -m rocforge_ci verify`) | Validates the selected image’s digest against GHCR and the recorded matrix value. |
 | `ci/rocforge_ci/update.py` (`python -m rocforge_ci update`) | Discovers new ROCm tags and records their digests for review. |
 | `.github/workflows/update-rocm.yml` | Weekly automation that runs the updater script and opens a PR with refreshed matrix data. |
+| `snapi/`, `extensions/clamp/` | Local ROCm environment capture/restore/verify logic exposed via SNAPI. |
+
+## Clamp core hand-off
+
+- `python3 -m rocforge_ci smart-bootstrap` and `offline-bootstrap` now look for
+  `build/clamp/manifest.json`. If present they emit `Clamp: manifest found …`, call the
+  SNAPI bridge (`clamp.restore` + `clamp.verify`), and require a passing verification for
+  the workflow to stay green.
+- Run telemetry lands in `build/run.json` with `mode`, `clamp_manifest_path`,
+  `verify_status`, and `verify_message`, giving downstream steps a cheap audit trail.
+- `ci/rocm_matrix.yml` accepts an optional `clamp_manifest:` field for documentation. The
+  live manifest from the workspace always takes precedence over the matrix hint.
 
 ## Resolver → Verifier Flow
 

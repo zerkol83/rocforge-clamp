@@ -20,9 +20,11 @@ from pathlib import Path
 from typing import Any, Dict
 
 from . import resolve_module, update_module, verify_module
+from .clamp_bridge import clamp_manifest_path, restore as clamp_restore, verify as clamp_verify
 from .diagnostics import collect_diagnostics
 from .matrix import ImageMetadata, read_matrix, update_matrix_entry
 from .resolve import DEFAULT_MIRROR, ResolveError, docker_tag_image, resolve_image
+from .runlog import record_run
 
 CI_MODE_FILE = Path(".ci_mode")
 
@@ -155,6 +157,36 @@ def offline_bootstrap(argv):
     print("[offline] bootstrap complete")
     record = write_ci_mode("offline", snapshot=snapshot_path)
     emit_run_summary(record)
+    clamp_path = clamp_manifest_path()
+    clamp_manifest_str = str(clamp_path) if clamp_path else None
+    if clamp_path:
+        print(f"[offline] Clamp: manifest found at {clamp_path}")
+        restore_result = clamp_restore({"manifest_path": str(clamp_path)})
+        print(f"[offline] Clamp restore: {restore_result.get('message')}")
+        verify_result = clamp_verify({"manifest_path": str(clamp_path)})
+        print(f"[offline] Clamp verify: {verify_result.get('message')}")
+        mismatches = verify_result.get("mismatches") or []
+        if mismatches:
+            for mismatch in mismatches:
+                field = mismatch.get("field")
+                reason = mismatch.get("reason")
+                print(f"[offline] Clamp mismatch: {field} ({reason})")
+        record_run(
+            mode="offline",
+            clamp_manifest_path=clamp_manifest_str,
+            verify_status=verify_result.get("status"),
+            verify_message=verify_result.get("message"),
+        )
+        if verify_result.get("status") != "pass":
+            return 2
+    else:
+        print("[offline] Clamp: manifest not found; skipping verification.")
+        record_run(
+            mode="offline",
+            clamp_manifest_path=None,
+            verify_status="skipped",
+            verify_message="no manifest",
+        )
     return 0
 
 
@@ -260,6 +292,41 @@ def smart_bootstrap(argv):
     if rc != 0:
         print("[smart] verification reported an issue.")
         return rc
+
+    clamp_path = clamp_manifest_path()
+    clamp_manifest_str = str(clamp_path) if clamp_path else None
+    verify_status = "skipped"
+    verify_message = "no manifest"
+    if clamp_path:
+        print(f"[smart] Clamp: manifest found at {clamp_path}")
+        restore_result = clamp_restore({"manifest_path": clamp_manifest_str})
+        print(f"[smart] Clamp restore: {restore_result.get('message')}")
+        verify_result = clamp_verify({"manifest_path": clamp_manifest_str})
+        verify_status = verify_result.get("status")
+        verify_message = verify_result.get("message")
+        print(f"[smart] Clamp verify: {verify_message}")
+        mismatches = verify_result.get("mismatches") or []
+        if mismatches:
+            for mismatch in mismatches:
+                field = mismatch.get("field")
+                reason = mismatch.get("reason")
+                print(f"[smart] Clamp mismatch: {field} ({reason})")
+    else:
+        print("[smart] Clamp: manifest not found; skipping verification.")
+
+    record_run(
+        mode=resolved.mode,
+        clamp_manifest_path=clamp_manifest_str,
+        verify_status=verify_status,
+        verify_message=verify_message,
+        extra={
+            "snapshot_path": str(snapshot_path),
+            "image": resolved.image,
+        },
+    )
+    if clamp_path and verify_status != "pass":
+        print("[smart] Clamp verification failed; aborting.")
+        return 2
 
     return 0
 

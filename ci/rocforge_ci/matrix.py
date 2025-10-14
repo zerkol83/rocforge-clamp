@@ -20,6 +20,7 @@ class ImageMetadata:
     tarball: str | None = None
     sha256: str | None = None
     timestamp: str | None = None
+    clamp_manifest: str | None = None
 
     @property
     def preferred_image(self) -> str:
@@ -41,6 +42,8 @@ class ImageMetadata:
             payload["sha256"] = self.sha256
         if self.timestamp:
             payload["timestamp"] = self.timestamp
+        if self.clamp_manifest:
+            payload["clamp_manifest"] = self.clamp_manifest
         return payload
 
 
@@ -70,6 +73,7 @@ def read_matrix(path: Path) -> Dict[str, ImageMetadata]:
             tarball = str(entry.get("tarball") or "").strip() or None
             sha256 = str(entry.get("sha256") or entry.get("hash") or "").strip() or None
             timestamp = str(entry.get("timestamp") or "").strip() or None
+            clamp_manifest = str(entry.get("clamp_manifest") or "").strip() or None
             metadata = ImageMetadata(
                 os_name=os_name,
                 image=image,
@@ -78,6 +82,7 @@ def read_matrix(path: Path) -> Dict[str, ImageMetadata]:
                 tarball=tarball,
                 sha256=sha256,
                 timestamp=timestamp,
+                clamp_manifest=clamp_manifest,
             )
         else:
             continue
