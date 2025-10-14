@@ -1,4 +1,5 @@
 ubuntu-22.04:
+  # Mirror primary matrix: prefer ubuntu-22.04-base until versioned tags return.
   image: ghcr.io/rocm/dev:ubuntu-22.04-base
 
 ubuntu-20.04:
