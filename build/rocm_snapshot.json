@@ -1,12 +1,15 @@
 {
+  "canonical": "rocforge/rocm-dev:6.4.4-ubuntu-20.04",
   "digest": "",
-  "image": "ghcr.io/rocm/dev:6.4.4-ubuntu-20.04",
-  "mode": "offline",
+  "image": "ghcr.io/zerkol83/rocm-dev:6.4.4-ubuntu-20.04",
+  "mode": "local",
   "os": "ubuntu-20.04",
   "policy_mode": "static",
-  "repository": "ghcr.io/rocm/dev",
+  "repository": "ghcr.io/zerkol83/rocm-dev",
   "resolved_at": "2025-10-14T00:59:43Z",
+  "sha256": "dc6c257646e1ed09f4eacff5594b12b8adb4c31f6917d337ca09925d536e629a",
   "tag": "6.4.4-ubuntu-20.04",
+  "tarball": "images/rocm-dev-6.4.4-ubuntu-20.04.tar.gz",
   "timestamp": "2025-10-14T00:59:43Z",
   "version": "6.4.4-ubuntu-20.04"
 }

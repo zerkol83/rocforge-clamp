@@ -95,4 +95,43 @@ timestamp, and snapshot path—ideal for structured CI logs:
 {"mode": "offline", "snapshot": "build/rocm_snapshot.json", "timestamp": "2024-07-15T08:32:11Z"}
 ```
 
+### Canonical ROCm Images
+
+Clamp relies on canonical ROCm base images that are built, hashed, and cached inside this
+repository. Use the helper command to generate and record a new image when AMD publishes
+a fresh ROCm drop:
+
+```bash
+python3 -m rocforge_ci cache-build \
+  --release 6.4.4 \
+  --os ubuntu-20.04 \
+  --canonical rocforge/rocm-dev:6.4.4-ubuntu-20.04 \
+  --image ghcr.io/zerkol83/rocm-dev:6.4.4-ubuntu-20.04 \
+  --mirror ghcr.io/zerkol83/rocm-dev \
+  --push
+```
+
+`cache-build` performs the following actions:
+- `docker build` of the canonical image using `images/Dockerfile` (or the path supplied via
+  `--dockerfile`).
+- `docker save` to `images/<tag>.tar.gz` with the compressed artifact hashed and recorded
+  in `ci/rocm_matrix.yml`.
+- SHA-256 computation of the compressed tarball and matrix update
+  (`ci/rocm_matrix.yml`) with the image tag, tarball path, hash, mirror tag, and timestamp.
+- Optional push to the mirror namespace (`--push`).
+
+During CI the workflows call `docker load -i images/*.tar.gz` before invoking
+`smart-bootstrap`. The resolver first checks for a matching tarball; if it exists and the
+hash matches the matrix entry, the run is marked as `mode: local` and no network is
+required. When the tarball is absent, the resolver attempts the GHCR mirror
+(`ghcr.io/zerkol83/rocm-dev`). Only if both cache and mirror are unavailable does
+`smart-bootstrap` fall back to the offline metadata path.
+
+Lifecycle management for ROCm updates:
+
+1. Build the new canonical image with `cache-build`.
+2. Commit the updated tarball, matrix metadata, and regenerated snapshot hash.
+3. Push the mirror tag and re-run CI to confirm the hash verification passes.
+4. Tag the repository (e.g. `v0.4.0`) to lock the verified toolchain.
+
 See `docs/technical_overview.md` for an in-depth discussion of the entropy lifecycle, temporal alignment algorithms, ROCm dependency graph, and stability metrics captured during the v0.4 validation campaign. The telemetry schema and reproducibility guarantees are defined in `docs/telemetry_spec.md`. The container resolver, digest verification pipeline, and update workflows are documented in `docs/ci_integrity_spec.md`.

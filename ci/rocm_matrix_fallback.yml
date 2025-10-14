@@ -1,6 +1,16 @@
 ubuntu-22.04:
   # Mirror primary matrix; reuse verified 6.4.4-ubuntu-20.04 tag for now.
-  image: ghcr.io/rocm/dev:6.4.4-ubuntu-20.04
+  image: ghcr.io/zerkol83/rocm-dev:6.4.4-ubuntu-22.04
+  mirror: ghcr.io/zerkol83/rocm-dev:6.4.4-ubuntu-22.04
+  canonical: rocforge/rocm-dev:6.4.4-ubuntu-22.04
+  tarball: images/rocm-dev-6.4.4-ubuntu-22.04.tar.gz
+  sha256: dc6c257646e1ed09f4eacff5594b12b8adb4c31f6917d337ca09925d536e629a
+  timestamp: "2025-10-14T00:59:43Z"
 
 ubuntu-20.04:
-  image: ghcr.io/rocm/dev:6.4.4-ubuntu-20.04
+  image: ghcr.io/zerkol83/rocm-dev:6.4.4-ubuntu-20.04
+  mirror: ghcr.io/zerkol83/rocm-dev:6.4.4-ubuntu-20.04
+  canonical: rocforge/rocm-dev:6.4.4-ubuntu-20.04
+  tarball: images/rocm-dev-6.4.4-ubuntu-20.04.tar.gz
+  sha256: dc6c257646e1ed09f4eacff5594b12b8adb4c31f6917d337ca09925d536e629a
+  timestamp: "2025-10-14T00:59:43Z"

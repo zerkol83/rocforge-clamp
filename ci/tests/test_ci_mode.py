@@ -18,6 +18,7 @@ from ci.rocforge_ci.__main__ import (  # noqa: E402
     offline_bootstrap,
     smart_bootstrap,
 )
+from ci.rocforge_ci.resolve import ResolvedImage  # noqa: E402
 
 
 class DummyModule:
@@ -40,6 +41,12 @@ class CiModeTests(unittest.TestCase):
             if src.exists():
                 target = local_ci / name
                 target.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+        local_images = Path("images")
+        local_images.mkdir(exist_ok=True)
+        src_images = ROOT / "images"
+        if src_images.exists():
+            for item in src_images.glob("*.tar.gz"):
+                (local_images / item.name).write_bytes(item.read_bytes())
 
     def tearDown(self) -> None:
         os.chdir(self._cwd)
@@ -59,43 +66,33 @@ class CiModeTests(unittest.TestCase):
         self.assertEqual(payload["timestamp"], payload["resolved_at"])
 
     def test_smart_bootstrap_online_records_mode(self):
+        resolved = ResolvedImage(
+            image="ghcr.io/zerkol83/rocm-dev:6.4.4-ubuntu-20.04",
+            repository="ghcr.io/zerkol83/rocm-dev",
+            tag="6.4.4-ubuntu-20.04",
+            digest="",
+            version="6.4.4-ubuntu-20.04",
+            os_name="ubuntu-20.04",
+            policy_mode="static",
+            signer=None,
+            mode="local",
+            tarball="images/rocm-dev-6.4.4-ubuntu-20.04.tar.gz",
+            sha256="dc6c257646e1ed09f4eacff5594b12b8adb4c31f6917d337ca09925d536e629a",
+            canonical="rocforge/rocm-dev:6.4.4-ubuntu-20.04",
+        )
+
         def fake_collect():
             return {"auth": {"http_code": 200, "status": "success"}}
 
-        def fake_update_cli(args):
-            self.assertEqual(args, [])
-            return 0
-
-        def fake_resolve_cli(args):
-            self.assertIn("--output", args)
-            output_path = Path(args[args.index("--output") + 1])
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            output_path.write_text(
-                json.dumps(
-                    {
-                        "mode": "online",
-                        "timestamp": "2024-01-01T00:00:00Z",
-                        "resolved_at": "2024-01-01T00:00:00Z",
-                        "image": "ghcr.io/rocm/dev:6.4.4-ubuntu-20.04@sha256:deadbeef",
-                        "repository": "ghcr.io/rocm/dev",
-                        "tag": "6.4.4-ubuntu-20.04",
-                        "digest": "sha256:deadbeef",
-                        "version": "6.4.4",
-                        "os": "ubuntu-22.04",
-                        "policy_mode": "strict",
-                    }
-                )
-            )
-            return 0
-
         with mock.patch("ci.rocforge_ci.__main__.collect_diagnostics", side_effect=fake_collect), mock.patch(
-            "ci.rocforge_ci.__main__.update_module", return_value=DummyModule(fake_update_cli)
-        ), mock.patch("ci.rocforge_ci.__main__.resolve_module", return_value=DummyModule(fake_resolve_cli)):
+            "ci.rocforge_ci.__main__.resolve_image", return_value=resolved
+        ), mock.patch("ci.rocforge_ci.__main__.verify_module") as verify_mod:
+            verify_mod().cli.return_value = 0
             rc = smart_bootstrap([])
 
         self.assertEqual(rc, 0)
         record = json.loads(CI_MODE_FILE.read_text())
-        self.assertEqual(record["mode"], "online")
+        self.assertEqual(record["mode"], "local")
         self.assertEqual(record["snapshot"], "build/rocm_snapshot.json")
         self.assertIn("timestamp", record)
 

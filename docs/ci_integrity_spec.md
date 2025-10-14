@@ -66,13 +66,15 @@ When `on_mismatch: auto_update` (policy mode `auto_update`) is active, any diges
 
 ```json
 {
-  "mode": "online",
+  "mode": "local",
   "timestamp": "2025-01-01T00:00:00Z",
-  "image": "ghcr.io/rocm/dev:6.4.4-ubuntu-20.04@sha256:79aa4398…",
-  "digest": "sha256:79aa4398…",
+  "image": "ghcr.io/zerkol83/rocm-dev:6.4.4-ubuntu-22.04",
+  "canonical": "rocforge/rocm-dev:6.4.4-ubuntu-22.04",
+  "digest": "",
   "resolved_at": "2025-01-01T00:00:00Z",
   "policy_mode": "strict",
-  "signer": "sigstore/rocforge-ci"
+  "tarball": "images/rocm-dev-6.4.4-ubuntu-22.04.tar.gz",
+  "sha256": "dc6c257646e1ed09f4eacff5594b12b8adb4c31f6917d337ca09925d536e629a"
 }
 ```
 
@@ -108,6 +110,24 @@ once GHCR credentials are configured.
   completes.
 - `python3 -m rocforge_ci diagnostics --ci` prints a condensed single-line status record
   for GHCR reachability checks.
+
+### Canonical ROCm Images
+
+- `python3 -m rocforge_ci cache-build --release <ver> --os <os>` builds the canonical
+  ROCm image, saves it to `images/`, computes the SHA-256 hash, updates the matrix entry,
+  and optionally pushes the mirror tag (`ghcr.io/zerkol83/rocm-dev:<tag>`).
+- Every CI workflow loads the cached tarballs with `docker load -i images/*.tar.gz`
+  before running `smart-bootstrap`. Local hashes are verified against
+  `ci/rocm_matrix.yml`; mismatches abort the run.
+- If the tarball is present, the resolver reports `mode: local` and avoids any network
+  calls. When the tarball is missing but the mirror image exists, the run downgrades to
+  `mode: mirror` and verifies the pulled image by streaming `docker save` through the same
+  SHA-256 computation. Only if both caches are unavailable does the resolver settle on
+  `mode: offline`.
+- When ROCm publishes a new release, rebuild once with `cache-build`, commit the new
+  tarball/hash metadata, push the mirror image, re-run CI, and tag the repository. This
+  guarantees that developers, CI, and deployments execute with the exact same verified
+  toolchain.
 
 ## Future Enhancements
 

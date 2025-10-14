@@ -20,6 +20,17 @@ jobs:
         run: |
           python3 -m pip install --user PyYAML requests
 
+      - name: Preload canonical ROCm image cache
+        run: |
+          if ls images/*.tar.gz >/dev/null 2>&1; then
+            for archive in images/*.tar.gz; do
+              echo "Loading $archive"
+              docker load -i "$archive"
+            done
+          else
+            echo "No cached ROCm images found.";
+          fi
+
       - name: Show cached CI mode
         run: python3 -m rocforge_ci mode show
 
@@ -78,6 +89,17 @@ jobs:
         run: |
           apt-get update
           apt-get install -y cmake ninja-build g++ python3 jq
+
+      - name: Preload canonical ROCm images
+        run: |
+          if ls images/*.tar.gz >/dev/null 2>&1; then
+            for archive in images/*.tar.gz; do
+              echo "Loading $archive"
+              docker load -i "$archive"
+            done
+          else
+            echo "No cached ROCm images found.";
+          fi
 
       - name: Restore snapshot metadata
         run: |

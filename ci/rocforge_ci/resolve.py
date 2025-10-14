@@ -6,23 +6,22 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import hashlib
 import json
 import os
-import re
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
-
-import yaml
+from typing import Dict, Optional
 
 from .diagnostics import collect_diagnostics
+from .matrix import ImageMetadata, read_matrix
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 MATRIX_PATH = PACKAGE_ROOT / "rocm_matrix.yml"
-POLICY_PATH = PACKAGE_ROOT / "rocm_policy.yml"
-REPOSITORY = "ghcr.io/rocm/dev"
+DEFAULT_MIRROR = "ghcr.io/zerkol83/rocm-dev"
 
 
 class ResolveError(RuntimeError):
@@ -39,12 +38,16 @@ class ResolvedImage:
     os_name: str
     policy_mode: str
     signer: Optional[str]
+    mode: str
+    tarball: Optional[str] = None
+    sha256: Optional[str] = None
+    canonical: Optional[str] = None
 
-    def snapshot(self, *, mode: str, timestamp: str | None = None) -> Dict[str, str]:
+    def snapshot(self, *, timestamp: str | None = None) -> Dict[str, str]:
         if not timestamp:
             timestamp = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
         data = {
-            "mode": mode,
+            "mode": self.mode,
             "timestamp": timestamp,
             "image": self.image,
             "repository": self.repository,
@@ -57,243 +60,240 @@ class ResolvedImage:
         }
         if self.signer:
             data["signer"] = self.signer
+        if self.tarball:
+            data["tarball"] = self.tarball
+        if self.sha256:
+            data["sha256"] = self.sha256
+        if self.canonical:
+            data["canonical"] = self.canonical
         return data
 
 
-def load_yaml(path: Path) -> Dict:
-    if not path.exists():
-        raise ResolveError(f"Required YAML file not found: {path}")
-    with path.open("r", encoding="utf-8") as handle:
-        return yaml.safe_load(handle) or {}
+def compute_file_sha256(path: Path) -> str:
+    hasher = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            if not chunk:
+                break
+            hasher.update(chunk)
+    return hasher.hexdigest()
 
 
-def load_matrix(path: Path) -> Dict:
-    data = load_yaml(path)
-    if "rocm" in data:
-        return {"kind": "rich", "payload": data["rocm"]}
-    # fallback simple mapping
-    return {"kind": "simple", "payload": data}
-
-
-def index_images(images: List[Dict]) -> Dict[Tuple[str, str], Dict]:
-    mapping: Dict[Tuple[str, str], Dict] = {}
-    for entry in images:
-        version = str(entry.get("version", "")).strip()
-        os_id = str(entry.get("os", "")).strip()
-        if not version or not os_id:
-            continue
-        mapping[(version, os_id)] = entry
-    return mapping
-
-
-def build_candidate_order(policy: Dict) -> List[Tuple[str, str]]:
-    default = policy.get("default", [])
-    if isinstance(default, (list, tuple)) and len(default) == 2:
-        default_version, default_os = str(default[0]), str(default[1])
-    elif isinstance(default, dict):
-        default_version = str(default.get("version", ""))
-        default_os = str(default.get("os", ""))
-    else:
-        raise ResolveError("Policy.default must define version and os")
-
-    prefer_os = str(policy.get("prefer_os", default_os)) if policy.get("prefer_os") else default_os
-    fallback_os = str(policy.get("fallback_os", default_os))
-    fallback_version = str(policy.get("fallback_version", default_version))
-
-    candidates: List[Tuple[str, str]] = []
-
-    preferred = (default_version, prefer_os)
-    if preferred not in candidates:
-        candidates.append(preferred)
-
-    default_pair = (default_version, default_os)
-    if default_pair not in candidates:
-        candidates.append(default_pair)
-
-    fallback_pair = (fallback_version, fallback_os)
-    if fallback_pair not in candidates:
-        candidates.append(fallback_pair)
-
-    return candidates
-
-
-def run_manifest_inspect(image_ref: str) -> Optional[Dict]:
-    env_skip = os.getenv("CLAMP_SKIP_MANIFEST")
-    if env_skip:
-        return {"digest": None}
+def compute_docker_image_sha256(image: str) -> str:
+    cmd = ["docker", "save", image]
     try:
-        proc = subprocess.run(
-            ["docker", "manifest", "inspect", "--verbose", image_ref],
-            check=False,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     except FileNotFoundError as exc:
-        raise ResolveError("docker CLI not available for manifest inspection") from exc
+        raise ResolveError("docker CLI not available to compute image hash") from exc
 
-    if proc.returncode != 0:
-        return None
-
-    digest = None
-    for chunk in filter(None, proc.stdout.strip().splitlines()):
-        chunk = chunk.strip()
-        try:
-            payload = json.loads(chunk)
-        except json.JSONDecodeError:
-            match = re.search(r'"digest"\s*:\s*"(sha256:[a-f0-9]+)"', chunk)
-            if match:
-                digest = match.group(1)
-                break
-            continue
-
-        descriptor = payload.get("Descriptor")
-        if isinstance(descriptor, dict) and descriptor.get("digest"):
-            digest = descriptor["digest"]
+    hasher = hashlib.sha256()
+    assert proc.stdout is not None
+    for chunk in iter(lambda: proc.stdout.read(1024 * 1024), b""):
+        if not chunk:
             break
-        if not digest and isinstance(payload.get("manifests"), list):
-            manifest_list = payload["manifests"]
-            for item in manifest_list:
-                dig = item.get("digest")
-                if isinstance(dig, str):
-                    digest = dig
-                    break
-            if digest:
-                break
+        hasher.update(chunk)
+    proc.stdout.close()
+    stderr = proc.stderr.read().decode("utf-8", "ignore") if proc.stderr else ""
+    return_code = proc.wait()
+    if return_code != 0:
+        raise ResolveError(f"Failed to compute docker image hash: {stderr.strip() or return_code}")
+    return hasher.hexdigest()
 
-    return {"digest": digest}
+
+def docker_load_tarball(tarball: Path) -> None:
+    cmd = ["docker", "load", "-i", str(tarball)]
+    try:
+        proc = subprocess.run(cmd, check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    except FileNotFoundError as exc:
+        raise ResolveError("docker CLI not available to load local tarball") from exc
+    if proc.returncode != 0:
+        raise ResolveError(f"docker load failed: {proc.stderr.strip() or proc.stdout.strip()}")
+
+
+def docker_pull_image(image: str) -> None:
+    cmd = ["docker", "pull", image]
+    try:
+        proc = subprocess.run(cmd, check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    except FileNotFoundError as exc:
+        raise ResolveError("docker CLI not available to pull mirror image") from exc
+    if proc.returncode != 0:
+        raise ResolveError(f"docker pull failed for {image}: {proc.stderr.strip() or proc.stdout.strip()}")
+
+
+def docker_tag_image(source: str, target: str) -> None:
+    if source == target:
+        return
+    cmd = ["docker", "tag", source, target]
+    proc = subprocess.run(cmd, check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if proc.returncode != 0:
+        raise ResolveError(f"docker tag {source} -> {target} failed: {proc.stderr.strip() or proc.stdout.strip()}")
+
+
+def select_metadata(entries: Dict[str, ImageMetadata], target_os: Optional[str]) -> ImageMetadata:
+    if target_os:
+        if target_os not in entries:
+            raise ResolveError(f"No matrix entry for OS {target_os}")
+        return entries[target_os]
+    if not entries:
+        raise ResolveError("Matrix must define at least one image")
+    # deterministic ordering by OS name
+    os_name = sorted(entries.keys())[0]
+    return entries[os_name]
 
 
 def resolve_image(
     matrix_path: Path = MATRIX_PATH,
-    policy_path: Path = POLICY_PATH,
     offline: bool = False,
+    target_os: Optional[str] = None,
+    prefer_local: bool = True,
+    mirror_namespace: str = DEFAULT_MIRROR,
 ) -> ResolvedImage:
-    matrix_descriptor = load_matrix(matrix_path)
-    kind = matrix_descriptor["kind"]
-    payload = matrix_descriptor["payload"]
+    entries = read_matrix(matrix_path)
+    metadata = select_metadata(entries, target_os)
+    policy_mode = "static"
 
-    if kind == "simple":
-        if not isinstance(payload, dict) or not payload:
-            raise ResolveError("Matrix must define at least one image")
-        # deterministic ordering by key name
-        os_id, entry = next(iter(sorted(payload.items(), key=lambda item: item[0])))
-        if isinstance(entry, dict):
-            image_ref = entry.get("image")
-        else:
-            image_ref = str(entry)
-        if not image_ref:
-            raise ResolveError(f"No image defined for {os_id}")
-        repo, tag = image_ref.split(":", 1) if ":" in image_ref else (image_ref, "")
+    image_ref = metadata.image or ""
+    if not image_ref:
+        raise ResolveError(f"Matrix entry for {metadata.os_name} missing image tag")
+
+    repository, tag = image_ref.split(":", 1) if ":" in image_ref else (image_ref, "")
+
+    if offline:
+        print(f"[resolve] offline mode selected for {metadata.os_name}")
         return ResolvedImage(
             image=image_ref,
-            repository=repo,
+            repository=repository,
             tag=tag,
             digest="",
-            version=tag or os_id,
-            os_name=os_id,
-            policy_mode="static",
+            version=tag or metadata.os_name,
+            os_name=metadata.os_name,
+            policy_mode=policy_mode,
             signer=None,
+            mode="offline",
+            tarball=metadata.tarball,
+            sha256=metadata.sha256,
+            canonical=metadata.canonical_image,
         )
 
-    matrix = payload
-    images = index_images(matrix.get("images", []))
-    if not images:
-        raise ResolveError("Image list is empty in matrix")
+    # Prefer local tarball if available.
+    if prefer_local and metadata.tarball:
+        tarball_path = Path(metadata.tarball)
+        if tarball_path.exists():
+            if metadata.sha256:
+                computed = compute_file_sha256(tarball_path)
+                if computed != metadata.sha256:
+                    raise ResolveError(
+                        f"Local tarball hash mismatch for {metadata.os_name}: {computed} != {metadata.sha256}"
+                    )
+            print(f"[resolve] loading local ROCm image tarball {tarball_path}")
+            docker_load_tarball(tarball_path)
+            canonical_tag = metadata.canonical_image
+            if canonical_tag and canonical_tag != image_ref:
+                docker_tag_image(canonical_tag, image_ref)
+            print(f"[resolve] mode local (tarball={tarball_path})")
+            return ResolvedImage(
+                image=image_ref,
+                repository=repository,
+                tag=tag,
+                digest="",
+                version=tag or metadata.os_name,
+                os_name=metadata.os_name,
+                policy_mode=policy_mode,
+                signer=None,
+                mode="local",
+                tarball=str(tarball_path),
+                sha256=metadata.sha256,
+                canonical=metadata.canonical_image,
+            )
 
-    policy = matrix.get("policy", {}).copy()
-    if policy_path.exists():
-        policy_data = load_yaml(policy_path)
-        if isinstance(policy_data, dict):
-            policy.update(policy_data.get("policy", {}))
-    policy_mode = str(policy.get("mode", "")).strip() or "strict"
-    candidates = build_candidate_order(policy)
-
-    first_error: Optional[str] = None
-
-    for version, os_id in candidates:
-        entry = images.get((version, os_id))
-        if not entry:
-            if first_error is None:
-                first_error = f"No matrix entry for {version}-{os_id}"
-            continue
-
-        tag = f"{version}-{os_id}"
-        ref = f"{REPOSITORY}:{tag}"
-
-        if offline:
-            resolved_digest = str(entry.get("digest", "")).strip()
-        else:
-            manifest = run_manifest_inspect(ref)
-            if manifest is None:
-                if first_error is None:
-                    first_error = f"Manifest inspection failed for {ref}"
-                continue
-
-            digest = str(entry.get("digest", "")).strip()
-            if digest and digest.startswith("sha256:") and not digest.endswith("TODO_NEXT_RELEASE"):
-                resolved_digest = digest
-            else:
-                resolved_digest = manifest.get("digest")
-
-            if not resolved_digest:
-                if first_error is None:
-                    first_error = f"Digest unavailable for {ref}"
-                continue
-
-        signer = None
-        provenance = entry.get("provenance")
-        if isinstance(provenance, dict):
-            signer = provenance.get("signer")
-
-        image_ref = f"{ref}@{resolved_digest}" if resolved_digest else ref
+    # Attempt mirror pull
+    mirror_image = metadata.mirror or metadata.image or f"{mirror_namespace}:{tag}"
+    try:
+        print(f"[resolve] pulling mirror image {mirror_image}")
+        docker_pull_image(mirror_image)
+        canonical_tag = metadata.canonical_image
+        if mirror_image != image_ref:
+            docker_tag_image(mirror_image, image_ref)
+        if canonical_tag and canonical_tag != image_ref:
+            docker_tag_image(image_ref, canonical_tag)
+        if metadata.sha256:
+            target_tag = canonical_tag or image_ref
+            computed = compute_docker_image_sha256(target_tag)
+            if computed != metadata.sha256:
+                raise ResolveError(
+                    f"Mirror image hash mismatch for {metadata.os_name}: {computed} != {metadata.sha256}"
+                )
+        print(f"[resolve] mode mirror (image={mirror_image})")
         return ResolvedImage(
             image=image_ref,
-            repository=REPOSITORY,
+            repository=repository,
             tag=tag,
-            digest=resolved_digest,
-            version=version,
-            os_name=os_id,
+            digest="",
+            version=tag or metadata.os_name,
+            os_name=metadata.os_name,
             policy_mode=policy_mode,
-            signer=signer,
+            signer=None,
+            mode="mirror",
+            tarball=metadata.tarball,
+            sha256=metadata.sha256,
+            canonical=metadata.canonical_image,
         )
+    except ResolveError as exc:
+        print(f"[resolve] mirror pull failed: {exc}")
 
-    raise ResolveError(first_error or "No valid ROCm image found")
+    print(f"[resolve] falling back to offline metadata for {metadata.os_name}")
+    return ResolvedImage(
+        image=image_ref,
+        repository=repository,
+        tag=tag,
+        digest="",
+        version=tag or metadata.os_name,
+        os_name=metadata.os_name,
+        policy_mode=policy_mode,
+        signer=None,
+        mode="offline",
+        tarball=metadata.tarball,
+        sha256=metadata.sha256,
+        canonical=metadata.canonical_image,
+    )
 
 
-def cli(argv: Optional[List[str]] = None) -> int:
+def cli(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Resolve ROCm container image")
     parser.add_argument("--matrix", type=Path, default=MATRIX_PATH, help="Path to the ROCm matrix YAML")
-    parser.add_argument("--policy", type=Path, default=POLICY_PATH, help="Path to the ROCm policy YAML")
     parser.add_argument("--output", type=Path, default=None, help="Optional path to write snapshot metadata")
-    parser.add_argument("--offline", action="store_true", help="Force offline resolution without GHCR calls")
-    parser.add_argument("--auto", action="store_true", help="Choose online/offline mode automatically")
+    parser.add_argument("--offline", action="store_true", help="Force offline resolution without docker operations")
+    parser.add_argument("--auto", action="store_true", help="Choose local/mirror/offline mode automatically")
+    parser.add_argument("--os", dest="target_os", default=None, help="Target OS key to resolve (e.g. ubuntu-22.04)")
     args = parser.parse_args(argv)
 
     if args.offline and args.auto:
         parser.error("--offline and --auto are mutually exclusive")
 
     use_offline = args.offline
+    prefer_local = not args.offline
     if args.auto:
         diag = collect_diagnostics()
         http_code = diag.get("auth", {}).get("http_code")
         use_offline = http_code not in (200, 401)
-        mode = "offline" if use_offline else "online"
-        print(f"[resolve] auto mode selected {mode} (auth_code={http_code})")
+        prefer_local = True
+        print(f"[resolve] auto mode selected {'offline' if use_offline else 'auto'} (auth_code={http_code})")
 
     try:
-        resolved = resolve_image(args.matrix, args.policy, offline=use_offline)
+        resolved = resolve_image(
+            matrix_path=args.matrix,
+            offline=use_offline,
+            target_os=args.target_os,
+            prefer_local=prefer_local,
+        )
     except ResolveError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
 
-    mode_label = "offline" if use_offline else "online"
-
     if args.output:
-        snapshot_timestamp = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
         args.output.parent.mkdir(parents=True, exist_ok=True)
         with args.output.open("w", encoding="utf-8") as handle:
-            json.dump(resolved.snapshot(mode=mode_label, timestamp=snapshot_timestamp), handle, indent=2, sort_keys=True)
+            json.dump(resolved.snapshot(), handle, indent=2, sort_keys=True)
             handle.write("\n")
 
     print(resolved.image)
