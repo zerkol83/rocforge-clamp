@@ -1,6 +1,6 @@
 ubuntu-22.04:
-  # Pin to long-lived ubuntu-22.04-base image until versioned tags return.
-  image: ghcr.io/rocm/dev:ubuntu-22.04-base
+  # Use the verified 6.4.4-ubuntu-20.04 tag until a matching 22.04 image is restored.
+  image: ghcr.io/rocm/dev:6.4.4-ubuntu-20.04
 
 ubuntu-20.04:
-  image: ghcr.io/rocm/dev:ubuntu-20.04-base
+  image: ghcr.io/rocm/dev:6.4.4-ubuntu-20.04

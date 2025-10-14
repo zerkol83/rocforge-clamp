@@ -12,7 +12,7 @@ Highlights
 - **Snapshot-driven aggregation** – `TemporalAggregator` now records only `mean_stability`, `stability_variance`, `drift_index`, and `session_count`, copying CI-generated metadata under `build_info` without verifying it.
 - **CI redesign** – `.github/workflows/clamp-ci.yml` resolves digests via `rocforge-ci`, stores `build/rocm_snapshot.json`, and passes `-DROCM_SNAPSHOT_JSON` to Clamp’s CMake configuration. Legacy scripts are thin shims around the package.
 - **CI verification** – GitHub Actions confirms `smart-bootstrap` emits structured JSON summaries, displays the persisted `.ci_mode` at job start, resets the marker on teardown, and surfaces warnings on mode flips, with no stray snapshots after completion.
-- **ROCm tag fix** – Workflows now pin the long-lived `ghcr.io/rocm/dev:ubuntu-22.04-base` image to avoid the missing `6.4.4-ubuntu-22.04` tag and keep container pulls stable.
+- **ROCm tag fix** – Workflows now pin the verified `ghcr.io/rocm/dev:6.4.4-ubuntu-20.04` image to avoid missing GHCR manifests and keep container pulls stable.
 - **Documentation refresh** – Added `docs/runtime_isolation.md` and updated `docs/ci_integrity_spec.md`, `docs/telemetry_spec.md`, and the README with the runtime vs CI responsibility split.
 
 

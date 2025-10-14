@@ -12,7 +12,7 @@ jobs:
       matrix:
         config: [default, parallel]
     container:
-      image: ghcr.io/rocm/dev:ubuntu-22.04-base
+      image: ghcr.io/rocm/dev:6.4.4-ubuntu-20.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,7 +31,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /opt/rocm
-          key: rocm-${{ runner.os }}-ubuntu-22.04-base
+          key: rocm-${{ runner.os }}-6.4.4-ubuntu-20.04
 
       - name: Install build dependencies
         run: |

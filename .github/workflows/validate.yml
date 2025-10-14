@@ -10,7 +10,7 @@ jobs:
   build-test:
     runs-on: ubuntu-22.04
     container:
-      image: ghcr.io/rocm/dev:ubuntu-22.04-base
+      image: ghcr.io/rocm/dev:6.4.4-ubuntu-20.04
     defaults:
       run:
         shell: bash

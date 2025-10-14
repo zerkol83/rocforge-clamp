@@ -68,7 +68,7 @@ When `on_mismatch: auto_update` (policy mode `auto_update`) is active, any diges
 {
   "mode": "online",
   "timestamp": "2025-01-01T00:00:00Z",
-  "image": "ghcr.io/rocm/dev:ubuntu-22.04-base@sha256:79aa4398…",
+  "image": "ghcr.io/rocm/dev:6.4.4-ubuntu-20.04@sha256:79aa4398…",
   "digest": "sha256:79aa4398…",
   "resolved_at": "2025-01-01T00:00:00Z",
   "policy_mode": "strict",
