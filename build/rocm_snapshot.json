@@ -5,8 +5,8 @@
   "os": "centos-7",
   "policy_mode": "static",
   "repository": "ghcr.io/rocm/dev",
-  "resolved_at": "2025-10-13T23:44:54Z",
+  "resolved_at": "2025-10-14T00:29:20Z",
   "tag": "centos-7-base",
-  "timestamp": "2025-10-13T23:44:54Z",
+  "timestamp": "2025-10-14T00:29:20Z",
   "version": "centos-7-base"
 }
