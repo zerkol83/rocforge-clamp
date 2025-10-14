@@ -1,12 +1,12 @@
 {
   "digest": "",
-  "image": "ghcr.io/rocm/dev:centos-7-base",
+  "image": "ghcr.io/rocm/dev:ubuntu-20.04-base",
   "mode": "offline",
-  "os": "centos-7",
+  "os": "ubuntu-20.04",
   "policy_mode": "static",
   "repository": "ghcr.io/rocm/dev",
-  "resolved_at": "2025-10-14T00:29:20Z",
-  "tag": "centos-7-base",
-  "timestamp": "2025-10-14T00:29:20Z",
-  "version": "centos-7-base"
+  "resolved_at": "2025-10-14T00:55:02Z",
+  "tag": "ubuntu-20.04-base",
+  "timestamp": "2025-10-14T00:55:02Z",
+  "version": "ubuntu-20.04-base"
 }
