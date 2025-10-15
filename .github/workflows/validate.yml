@@ -29,15 +29,34 @@ jobs:
         run: |
           python3 -m pip install --user PyYAML requests
 
-      - name: Preload canonical ROCm images
+      - name: Validate ROCm cache
         run: |
+          status="ok"
           if ls images/*.tar.gz >/dev/null 2>&1; then
             for archive in images/*.tar.gz; do
-              echo "Loading $archive"
-              docker load -i "$archive"
+              echo "Validating $archive"
+              if ! gzip -t "$archive"; then
+                echo "::warning::gzip validation failed for $archive"
+                status="warn"
+                continue
+              fi
+              sha=$(sha256sum "$archive" | awk '{print $1}')
+              echo "$archive sha256=$sha"
+              if command -v docker >/dev/null 2>&1; then
+                if docker load -i "$archive"; then
+                  echo "Loaded image: $(basename "$archive")"
+                else
+                  echo "::warning::docker load failed for $archive"
+                  status="warn"
+                fi
+              else
+                echo "::warning::Docker unavailable; skipping load for $archive"
+                status="warn"
+              fi
             done
           else
-            echo "No cached ROCm images found.";
+            echo "::warning::No cached ROCm images found."
+            status="warn"
           fi
 
       - name: Show cached CI mode
@@ -45,7 +64,7 @@ jobs:
 
       - name: Smart bootstrap
         run: |
-          python3 -m rocforge_ci smart-bootstrap
+          python3 -m rocforge_ci smart-bootstrap || python3 -m rocforge_ci offline-bootstrap
 
       - name: Configure with CMake
         run: |
@@ -62,6 +81,13 @@ jobs:
         working-directory: build
         run: |
           ctest --output-on-failure
+
+      - name: Run Python tests
+        run: |
+          python3 -m unittest tests.cli.test_clamp_cli
+          python3 -m unittest tests.clamp.test_clamp_extension
+          python3 -m unittest tests.clamp.test_rocm_verifier
+          python3 ci/tests/test_ci_mode.py
 
       - name: Export telemetry (optional)
         if: success()

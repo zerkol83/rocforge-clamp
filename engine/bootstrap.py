@@ -14,6 +14,9 @@ _KNOWN_EXTENSIONS = (
     "extensions.clamp",
     "extensions.rocsync",
     "extensions.telemetry",
+    "extensions.sysmon_snapi",
+    "extensions.crucible",
+    "extensions.anvil",
 )
 
 

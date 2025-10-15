@@ -24,6 +24,8 @@ This document describes how Clamp validates and maintains the ROCm container mat
   `verify_status`, and `verify_message`, giving downstream steps a cheap audit trail.
 - `ci/rocm_matrix.yml` accepts an optional `clamp_manifest:` field for documentation. The
   live manifest from the workspace always takes precedence over the matrix hint.
+- GitHub workflows validate cached ROCm tarballs with `gzip -t` + SHA-256 before loading;
+  failures degrade the run to warnings and trigger automatic offline bootstrap fallback.
 
 ## Resolver → Verifier Flow
 

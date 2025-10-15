@@ -115,6 +115,14 @@ Use `--json` for machine-readable output, `--lenient` to treat verification mism
 as warnings, and `rocfoundry clamp show build/clamp/manifest.json --summary` to inspect
 the captured metadata without editing JSON manually.
 
+### sysmon_snapi — live ROCm fingerprinting
+- The new `sysmon_snapi` extension registers automatically; call
+  `snapi.dispatch('sysmon_snapi.monitor', {})` from a TTY to launch the live monitor.
+- It prints a `screenfetch -N` header, multi-layer ROCm verification summary, and live
+  CPU/GPU/RAM/TEMP bars updated each second.
+- Environment fingerprints (state, versions, SHA-256 hash) are available via
+  `snapi.dispatch('sysmon_snapi.fingerprint', {})` and power future Crucible remediation.
+
 ### CI integration snapshot
 - `python3 -m rocforge_ci smart-bootstrap` now prints whether a Clamp manifest was found
   and records the verification outcome.

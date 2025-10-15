@@ -1,5 +1,5 @@
-cat > .github/workflows/clamp-ci.yml <<'EOF'
 name: Clamp CI
+
 on:
   push:
     branches: [ main, master ]
@@ -9,9 +9,9 @@ jobs:
   resolve-image:
     runs-on: ubuntu-latest
     outputs:
-      image: ${{ steps.smart.outputs.image }}
-      digest_status: ${{ steps.smart.outputs.status }}
-      snapshot_b64: ${{ steps.smart.outputs.snapshot_b64 }}
+      image: ${{ steps.bootstrap.outputs.image }}
+      digest_status: ${{ steps.bootstrap.outputs.status }}
+      snapshot_b64: ${{ steps.bootstrap.outputs.snapshot_b64 }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -19,34 +19,65 @@ jobs:
       - name: Install resolver dependencies
         run: python3 -m pip install --user PyYAML requests
 
-      - name: Preload canonical ROCm image cache
+      - name: Validate ROCm cache
         run: |
+          status="ok"
           if ls images/*.tar.gz >/dev/null 2>&1; then
             for archive in images/*.tar.gz; do
-              echo "Loading $archive"
-              docker load -i "$archive" || echo "::warning::Failed to load $archive"
+              echo "Validating $archive"
+              if ! gzip -t "$archive"; then
+                echo "::warning::gzip validation failed for $archive"
+                status="warn"
+                continue
+              fi
+              sha=$(sha256sum "$archive" | awk '{print $1}')
+              echo "$archive sha256=$sha"
+              if command -v docker >/dev/null 2>&1; then
+                if docker load -i "$archive"; then
+                  echo "Loaded image: $(basename "$archive")"
+                else
+                  echo "::warning::docker load failed for $archive"
+                  status="warn"
+                fi
+              else
+                echo "::warning::Docker unavailable; skipping load for $archive"
+                status="warn"
+              fi
             done
           else
-            echo "No cached ROCm images found."
+            echo "::warning::No cached ROCm images found."
+            status="warn"
           fi
+          echo "cache_status=$status" >> "$GITHUB_OUTPUT"
 
       - name: Show cached CI mode
         run: python3 -m rocforge_ci mode show
 
       - name: Smart bootstrap
-        id: smart
+        id: bootstrap
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          python3 -m rocforge_ci smart-bootstrap
+          python3 -m rocforge_ci smart-bootstrap || python3 -m rocforge_ci offline-bootstrap
           image=$(python3 -c 'import json; print(json.load(open("build/rocm_snapshot.json"))["image"])')
           echo "image=$image" >> "$GITHUB_OUTPUT"
           snapshot_b64=$(base64 -w0 build/rocm_snapshot.json)
           echo "snapshot_b64=$snapshot_b64" >> "$GITHUB_OUTPUT"
           status="ok"
-          python3 -m rocforge_ci verify --auto "$image" || status="fail"
+          python3 -m rocforge_ci verify --auto "$image"
+          rc=$?
+          if [ $rc -eq 1 ]; then
+            status="warn"
+            echo "::warning::ROCm digest verification reported warnings"
+          elif [ $rc -eq 2 ]; then
+            status="fail"
+            echo "::warning::ROCm digest verification failed"
+          fi
           echo "status=$status" >> "$GITHUB_OUTPUT"
+          if [ "$status" = "fail" ]; then
+            exit 1
+          fi
 
       - name: Reset CI mode marker
         if: always()
@@ -58,37 +89,60 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        config: [default, parallel]
+        config: [ default, parallel ]
     container:
       image: ${{ needs.resolve-image.outputs.image }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Confirm image
-        run: echo "Container running from ${{ needs.resolve-image.outputs.image }}"
-
-      - name: Install build dependencies
+      - name: Validate ROCm cache
         run: |
-          apt-get update -y
-          apt-get install -y cmake ninja-build g++ python3 jq
+          status="ok"
+          if ls images/*.tar.gz >/dev/null 2>&1; then
+            for archive in images/*.tar.gz; do
+              echo "Validating $archive"
+              if ! gzip -t "$archive"; then
+                echo "::warning::gzip validation failed for $archive"
+                status="warn"
+                continue
+              fi
+              sha=$(sha256sum "$archive" | awk '{print $1}')
+              echo "$archive sha256=$sha"
+              if command -v docker >/dev/null 2>&1; then
+                if docker load -i "$archive"; then
+                  echo "Loaded image: $(basename "$archive")"
+                else
+                  echo "::warning::docker load failed for $archive"
+                  status="warn"
+                fi
+              else
+                echo "::warning::Docker unavailable; skipping load for $archive"
+                status="warn"
+              fi
+            done
+          else
+            echo "::warning::No cached ROCm images found."
+            status="warn"
+          fi
+          echo "cache_status=$status" >> "$GITHUB_OUTPUT"
 
       - name: Restore snapshot metadata
         run: |
           mkdir -p build
           printf '%s' "${{ needs.resolve-image.outputs.snapshot_b64 }}" | base64 -d > build/rocm_snapshot.json
 
-      - name: Configure
+      - name: Configure project
         run: |
           export PATH=/opt/rocm/bin:$PATH
           cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=/opt/rocm -DROCM_SNAPSHOT_JSON=build/rocm_snapshot.json
 
-      - name: Build
+      - name: Build project
         run: |
           export PATH=/opt/rocm/bin:$PATH
           cmake --build build
 
-      - name: Test
+      - name: Run CTest
         run: |
           export PATH=/opt/rocm/bin:$PATH
           if [ "${{ matrix.config }}" = "parallel" ]; then
@@ -117,6 +171,17 @@ jobs:
           else
             echo "No telemetry data found — skipping stability summary."
           fi
+
+      - name: Run Python tests
+        run: |
+          python3 -m unittest tests.cli.test_clamp_cli
+          python3 -m unittest tests.clamp.test_clamp_extension
+          python3 -m unittest tests.clamp.test_rocm_verifier
+          python3 ci/tests/test_ci_mode.py
+
+      - name: Reset CI mode marker
+        if: always()
+        run: python3 -m rocforge_ci mode reset
 
       - name: Archive Telemetry
         if: matrix.config == 'parallel' && always()
