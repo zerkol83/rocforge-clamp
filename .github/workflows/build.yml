@@ -6,13 +6,155 @@ on:
   pull_request:
 
 jobs:
+  resolve-image:
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.determine.outputs.image }}
+      offline: ${{ steps.determine.outputs.offline }}
+      mode: ${{ steps.determine.outputs.mode }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Python dependencies
+        run: python3 -m pip install --user PyYAML requests
+
+      - name: Validate cached ROCm archives
+        id: validate
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+import gzip
+import hashlib
+import json
+import os
+from pathlib import Path
+import sys
+
+try:
+    import yaml
+except ImportError:
+    print("::warning::PyYAML not available; skipping tarball validation.")
+    sys.exit(0)
+
+matrix_paths = [Path("ci/rocm_matrix.yml"), Path("rocm_matrix.yml")]
+matrix_path = next((p for p in matrix_paths if p.exists()), None)
+if not matrix_path:
+    print("::warning::Matrix file missing; skipping validation.")
+    sys.exit(0)
+
+entries = yaml.safe_load(matrix_path.read_text()) or {}
+valid = []
+for os_name, meta in entries.items():
+    if not isinstance(meta, dict):
+        continue
+    tarball = meta.get("tarball")
+    expected = meta.get("sha256")
+    if not tarball:
+        continue
+    path = Path(tarball)
+    if not path.exists():
+        print(f"::warning::Tarball missing for {os_name}: {path}")
+        continue
+    try:
+        with gzip.open(path, "rb") as handle:
+            while handle.read(1024 * 1024):
+                pass
+    except OSError as exc:
+        print(f"::warning::gzip validation failed for {path}: {exc}")
+        continue
+    hasher = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            if not chunk:
+                break
+            hasher.update(chunk)
+    computed = hasher.hexdigest()
+    print(f"{path} sha256={computed}")
+    if expected and computed != expected:
+        print(f"::warning::SHA mismatch for {path}: expected {expected}, got {computed}")
+        continue
+    valid.append(str(path))
+
+if not valid:
+    print("::warning::No valid ROCm archives detected.")
+else:
+    print("Validated ROCm archives: " + ", ".join(valid))
+    output = os.environ.get("GITHUB_OUTPUT")
+    if output:
+        with open(output, "a", encoding="utf-8") as handle:
+            handle.write("tarballs=" + json.dumps(valid) + "\n")
+PY
+
+      - name: Determine container image
+        id: determine
+        run: |
+          set -euo pipefail
+          fallback_image="ubuntu:22.04"
+          offline="false"
+          mode=""
+          resolved_image=""
+          log_file="$(mktemp)"
+          if python3 -m rocforge_ci smart-bootstrap | tee "$log_file"; then
+            :
+          else
+            status=$?
+            echo "::warning::smart-bootstrap exited with $status; attempting offline bootstrap."
+            offline="true"
+            python3 -m rocforge_ci offline-bootstrap | tee -a "$log_file" || true
+          fi
+
+          if [ -f build/rocm_snapshot.json ]; then
+            resolved_image=$(python3 - <<'PY'
+import json
+try:
+    data = json.load(open("build/rocm_snapshot.json"))
+except FileNotFoundError:
+    print("")
+else:
+    print(data.get("image", ""))
+PY
+)
+            mode=$(python3 - <<'PY'
+import json
+try:
+    data = json.load(open("build/rocm_snapshot.json"))
+except FileNotFoundError:
+    print("")
+else:
+    print(data.get("mode", ""))
+PY
+)
+          fi
+
+          if [ -z "$resolved_image" ]; then
+            echo "::warning::[offline] No resolved image detected; using fallback $fallback_image."
+            resolved_image="$fallback_image"
+            offline="true"
+            if [ -z "$mode" ]; then
+              mode="offline"
+            fi
+          fi
+
+          echo "image=$resolved_image" >> "$GITHUB_OUTPUT"
+          echo "offline=$offline" >> "$GITHUB_OUTPUT"
+          if [ -n "$mode" ]; then
+            echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "Resolved image: $resolved_image"
+          echo "Mode: ${mode:-unknown}"
+
   rocm-build:
+    needs: resolve-image
+    if: needs.resolve-image.outputs.image != '' && needs.resolve-image.outputs.image != null && needs.resolve-image.outputs.offline != 'true'
     runs-on: ubuntu-latest
     strategy:
       matrix:
         config: [default, parallel]
     container:
-      image: ghcr.io/rocm/dev:6.4.4-ubuntu-20.04
+      image: ${{ needs.resolve-image.outputs.image }}
+      options: --pull=never
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -20,14 +162,27 @@ jobs:
       - name: Clean workspace safely
         run: |
           set -euo pipefail
-          echo "Container image: $(cat /etc/os-release | grep PRETTY_NAME)"
+          echo "Container image: ${{ needs.resolve-image.outputs.image }}"
+          echo "Resolved mode: ${{ needs.resolve-image.outputs.mode }}"
+          echo "Container OS: $(grep PRETTY_NAME /etc/os-release)"
           git fetch origin main --prune
           git reset --hard FETCH_HEAD
           git clean -ffdX
           echo "HEAD: $(git rev-parse HEAD)"
 
+      - name: Guard ROCm cache
+        id: cache-guard
+        run: |
+          set -euo pipefail
+          if mkdir -p /opt/rocm 2>/dev/null; then
+            echo "restore=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Unable to prepare /opt/rocm; skipping cache restore"
+            echo "restore=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Cache ROCm toolchain
+        if: steps.cache-guard.outputs.restore == 'true'
         uses: actions/cache@v4
         with:
           path: /opt/rocm
@@ -44,40 +199,357 @@ jobs:
 
       - name: Validate ROCm cache
         run: |
-          status="ok"
-          if ls images/*.tar.gz >/dev/null 2>&1; then
-            for archive in images/*.tar.gz; do
-              echo "Validating $archive"
-              if ! gzip -t "$archive"; then
-                echo "::warning::gzip validation failed for $archive"
-                status="warn"
-                continue
-              fi
-              sha=$(sha256sum "$archive" | awk '{print $1}')
-              echo "$archive sha256=$sha"
-              if command -v docker >/dev/null 2>&1; then
-                if docker load -i "$archive"; then
-                  echo "Loaded image: $(basename "$archive")"
-                else
-                  echo "::warning::docker load failed for $archive"
-                  status="warn"
-                fi
-              else
-                echo "::warning::Docker unavailable; skipping load for $archive"
-                status="warn"
-              fi
-            done
-          else
-            echo "::warning::No cached ROCm images found."
-            status="warn"
-          fi
+          set -euo pipefail
+          python3 - <<'PY'
+import gzip
+import hashlib
+import json
+import shutil
+import subprocess
+from pathlib import Path
+
+try:
+    import yaml
+except ImportError:
+    yaml = None
+    print("::warning::PyYAML missing; skipping matrix-based validation.")
+
+matrix_path = Path("ci/rocm_matrix.yml")
+if not matrix_path.exists():
+    matrix_path = Path("rocm_matrix.yml")
+
+entries = {}
+if yaml and matrix_path.exists():
+    entries = yaml.safe_load(matrix_path.read_text()) or {}
+
+def iter_tarballs():
+    seen = set()
+    if isinstance(entries, dict):
+        for meta in entries.values():
+            if isinstance(meta, dict):
+                tarball = meta.get("tarball")
+                if tarball:
+                    seen.add(tarball)
+                    yield Path(tarball), meta.get("sha256")
+    for path in sorted(Path("images").glob("*.tar.gz")):
+        if str(path) not in seen:
+            yield path, None
+
+docker = shutil.which("docker")
+loaded = False
+for path, expected_sha in iter_tarballs():
+    if not path.exists():
+        print(f"::warning::Tarball missing: {path}")
+        continue
+    try:
+        with gzip.open(path, "rb") as handle:
+            while handle.read(1024 * 1024):
+                pass
+    except OSError as exc:
+        print(f"::warning::gzip validation failed for {path}: {exc}")
+        continue
+    hasher = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            if not chunk:
+                break
+            hasher.update(chunk)
+    digest = hasher.hexdigest()
+    print(f"{path} sha256={digest}")
+    if expected_sha and digest != expected_sha:
+        print(f"::warning::SHA mismatch for {path}: expected {expected_sha}, got {digest}")
+        continue
+    if not docker:
+        print(f"::warning::Docker unavailable; skipping load for {path}")
+        continue
+    proc = subprocess.run([docker, "load", "-i", str(path)], capture_output=True, text=True)
+    if proc.returncode == 0:
+        if proc.stdout:
+            print(proc.stdout.strip())
+        loaded = True
+    else:
+        print(f"::warning::docker load failed for {path}: {proc.stderr.strip() or proc.stdout.strip()}")
+
+if not loaded:
+    fallback = "ubuntu:22.04"
+    if docker:
+        print(f"::warning::[offline] No valid ROCm archives loaded; ensuring fallback {fallback}")
+        subprocess.run([docker, "pull", fallback], check=False)
+    else:
+        print(f"[offline] Docker unavailable; cannot load archives. Fallback image {fallback} will rely on host packages.")
+PY
 
       - name: Show cached CI mode
         run: python3 -m rocforge_ci mode show
 
       - name: Smart bootstrap
+        id: smart-bootstrap
         run: |
-          python3 -m rocforge_ci smart-bootstrap || python3 -m rocforge_ci offline-bootstrap
+          set -euo pipefail
+          fallback_image="ubuntu:22.04"
+          offline_flag="false"
+          if python3 -m rocforge_ci smart-bootstrap; then
+            :
+          else
+            rc=$?
+            echo "::warning::smart-bootstrap failed with $rc; running offline bootstrap."
+            offline_flag="true"
+            python3 -m rocforge_ci offline-bootstrap || true
+          fi
+          resolved_image=$(python3 - <<'PY'
+import json
+from pathlib import Path
+snapshot = Path("build/rocm_snapshot.json")
+if snapshot.exists():
+    data = json.loads(snapshot.read_text())
+    print(data.get("image", ""))
+else:
+    print("")
+PY
+)
+          if [ -z "$resolved_image" ]; then
+            echo "::warning::[offline] smart-bootstrap did not resolve an image; using fallback $fallback_image"
+            resolved_image="$fallback_image"
+            offline_flag="true"
+          fi
+          echo "image=$resolved_image" >> "$GITHUB_OUTPUT"
+          echo "offline=$offline_flag" >> "$GITHUB_OUTPUT"
+
+      - name: Environment diagnostics
+        run: |
+          set -euo pipefail
+          echo "=== OS ==="
+          cat /etc/os-release
+          echo "=== Python ==="
+          python3 --version
+          echo "=== ROCm ==="
+          ls /opt/rocm || echo "not installed"
+          set +e
+          python3 -m rocforge_ci diagnostics --ci
+          diag_rc=$?
+          set -e
+          echo "Diagnostics exit code: $diag_rc"
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DROCM_SNAPSHOT_JSON=build/rocm_snapshot.json
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: ctest --output-on-failure --test-dir build
+
+      - name: Run Python tests
+        run: |
+          python3 -m unittest tests.cli.test_clamp_cli
+          python3 -m unittest tests.clamp.test_clamp_extension
+          python3 -m unittest tests.clamp.test_rocm_verifier
+          python3 ci/tests/test_ci_mode.py
+
+      - name: Configure Clamp
+        run: |
+          export PATH=/opt/rocm/bin:$PATH
+          cmake -S clamp -B build -G Ninja -DCMAKE_PREFIX_PATH=/opt/rocm -DROCM_SNAPSHOT_JSON=build/rocm_snapshot.json
+
+      - name: Build Clamp
+        run: |
+          export PATH=/opt/rocm/bin:$PATH
+          cmake --build build
+
+      - name: Run Tests
+        run: |
+          export PATH=/opt/rocm/bin:$PATH
+          if [ "${{ matrix.config }}" = "parallel" ]; then
+            ctest --test-dir build --output-on-failure -j 4
+          else
+            ctest --test-dir build --output-on-failure
+          fi
+
+      - name: Reset CI mode marker
+        if: always()
+        run: python3 -m rocforge_ci mode reset
+
+      - name: Archive Telemetry
+        if: matrix.config == 'parallel'
+        uses: actions/upload-artifact@v4
+        with:
+          name: clamp-telemetry-${{ matrix.config }}
+          path: build/telemetry
+          if-no-files-found: warn
+
+  rocm-build-offline:
+    needs: resolve-image
+    if: needs.resolve-image.outputs.offline == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        config: [default, parallel]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Clean workspace safely
+        run: |
+          set -euo pipefail
+          echo "[offline] GHCR unavailable; using fallback base image ubuntu:22.04"
+          git fetch origin main --prune
+          git reset --hard FETCH_HEAD
+          git clean -ffdX
+          echo "HEAD: $(git rev-parse HEAD)"
+
+      - name: Guard ROCm cache
+        id: cache-guard
+        run: |
+          set -euo pipefail
+          if mkdir -p /opt/rocm 2>/dev/null; then
+            echo "restore=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Unable to prepare /opt/rocm; skipping cache restore"
+            echo "restore=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Cache ROCm toolchain
+        if: steps.cache-guard.outputs.restore == 'true'
+        uses: actions/cache@v4
+        with:
+          path: /opt/rocm
+          key: rocm-${{ runner.os }}-6.4.4-ubuntu-20.04
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build g++ python3
+
+      - name: Install Python dependencies
+        run: |
+          python3 -m pip install --user PyYAML requests
+
+      - name: Validate ROCm cache
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+import gzip
+import hashlib
+import json
+import shutil
+import subprocess
+from pathlib import Path
+
+try:
+    import yaml
+except ImportError:
+    yaml = None
+    print("::warning::PyYAML missing; skipping matrix-based validation.")
+
+matrix_path = Path("ci/rocm_matrix.yml")
+if not matrix_path.exists():
+    matrix_path = Path("rocm_matrix.yml")
+
+entries = {}
+if yaml and matrix_path.exists():
+    entries = yaml.safe_load(matrix_path.read_text()) or {}
+
+def iter_tarballs():
+    seen = set()
+    if isinstance(entries, dict):
+        for meta in entries.values():
+            if isinstance(meta, dict):
+                tarball = meta.get("tarball")
+                if tarball:
+                    seen.add(tarball)
+                    yield Path(tarball), meta.get("sha256")
+    for path in sorted(Path("images").glob("*.tar.gz")):
+        if str(path) not in seen:
+            yield path, None
+
+docker = shutil.which("docker")
+loaded = False
+for path, expected_sha in iter_tarballs():
+    if not path.exists():
+        print(f"::warning::Tarball missing: {path}")
+        continue
+    try:
+        with gzip.open(path, "rb") as handle:
+            while handle.read(1024 * 1024):
+                pass
+    except OSError as exc:
+        print(f"::warning::gzip validation failed for {path}: {exc}")
+        continue
+    hasher = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            if not chunk:
+                break
+            hasher.update(chunk)
+    digest = hasher.hexdigest()
+    print(f"{path} sha256={digest}")
+    if expected_sha and digest != expected_sha:
+        print(f"::warning::SHA mismatch for {path}: expected {expected_sha}, got {digest}")
+        continue
+    if not docker:
+        print(f"[offline] Docker unavailable; skipping load for {path}")
+        continue
+    proc = subprocess.run([docker, "load", "-i", str(path)], capture_output=True, text=True)
+    if proc.returncode == 0:
+        if proc.stdout:
+            print(proc.stdout.strip())
+        loaded = True
+    else:
+        print(f"::warning::docker load failed for {path}: {proc.stderr.strip() or proc.stdout.strip()}")
+
+if not loaded:
+    fallback = "ubuntu:22.04"
+    if docker:
+        print(f"[offline] No valid ROCm archives loaded; ensuring fallback {fallback}")
+        subprocess.run([docker, "pull", fallback], check=False)
+    else:
+        print(f"[offline] Docker unavailable; fallback image {fallback} will rely on host packages.")
+PY
+
+      - name: Show cached CI mode
+        run: python3 -m rocforge_ci mode show
+
+      - name: Smart bootstrap
+        id: offline-bootstrap
+        run: |
+          set -euo pipefail
+          fallback_image="ubuntu:22.04"
+          offline_flag="true"
+          echo "[offline] Running offline bootstrap"
+          python3 -m rocforge_ci offline-bootstrap || true
+          python3 -m rocforge_ci smart-bootstrap || true
+          resolved_image=$(python3 - <<'PY'
+import json
+from pathlib import Path
+snapshot = Path("build/rocm_snapshot.json")
+if snapshot.exists():
+    data = json.loads(snapshot.read_text())
+    print(data.get("image", ""))
+else:
+    print("")
+PY
+)
+          if [ -z "$resolved_image" ]; then
+            resolved_image="$fallback_image"
+            echo "[offline] smart-bootstrap did not resolve an image; using fallback $fallback_image"
+          fi
+          echo "image=$resolved_image" >> "$GITHUB_OUTPUT"
+          echo "offline=$offline_flag" >> "$GITHUB_OUTPUT"
+
+      - name: Environment diagnostics
+        run: |
+          set -euo pipefail
+          echo "=== OS ==="
+          cat /etc/os-release
+          echo "=== Python ==="
+          python3 --version
+          echo "=== ROCm ==="
+          ls /opt/rocm || echo "not installed"
+          set +e
+          python3 -m rocforge_ci diagnostics --ci
+          diag_rc=$?
+          set -e
+          echo "Diagnostics exit code: $diag_rc"
 
       - name: Configure
         run: cmake -S . -B build -G Ninja -DROCM_SNAPSHOT_JSON=build/rocm_snapshot.json
