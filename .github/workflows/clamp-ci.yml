@@ -91,7 +91,7 @@ jobs:
       matrix:
         config: [ default, parallel ]
     container:
-      image: ${{ needs.resolve-image.outputs.image }}
+      image: ${{ needs.resolve-image.outputs.image != '' && needs.resolve-image.outputs.image || 'ghcr.io/zerkol83/rocm-dev:6.4.4-ubuntu-20.04' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
