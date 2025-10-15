@@ -1,0 +1,14 @@
+# ninja log v6
+1	1293	1760489693676980999	CMakeFiles/clamp.dir/src/clamp.cpp.o	6bf10a779c201f3
+3	1301	1760489693676980999	CMakeFiles/clamp_aggregator_test.dir/tests/test_aggregator.cpp.o	cefb91bfcec4ab13
+3	1316	1760489693676980999	CMakeFiles/clamp_scoring_test.dir/tests/test_scoring.cpp.o	52b84e8073cfa590
+2	1480	1760489693676980999	CMakeFiles/clamp.dir/src/scoring/TemporalScoring.cpp.o	77510381f9e0cae0
+4097	4130	1760489697773026581	clamp_scoring_test	18aa2becef6717d7
+3	1441	1760489693676980999	CMakeFiles/clamp_test.dir/tests/test_clamp.cpp.o	196d7b68af5919c9
+1	1505	1760489693676980999	CMakeFiles/clamp.dir/src/telemetry/entropy_telemetry.cpp.o	30705c35b775b7b4
+2	4034	1760489693676980999	CMakeFiles/clamp.dir/src/telemetry/entropy_validation.cpp.o	6dc16ae1e3d63653
+4034	4096	1760489697709025870	libclamp.a	39d5e0b26ebedf10
+2	1543	1760489693676980999	CMakeFiles/clamp.dir/src/telemetry/temporal_aggregator.cpp.o	1db9e79fefe526af
+2	2307	1760489693676980999	CMakeFiles/clamp.dir/src/telemetry/entropy_validation.hip.o	386b1bb88b104abd
+4098	4129	1760489697773026581	clamp_aggregator_test	550ed955fd5af61e
+4096	4131	1760489697769026536	clamp_test	6eecf76906b011b5

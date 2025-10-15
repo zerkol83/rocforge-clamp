@@ -1,0 +1,22 @@
+{
+  "records": [
+    {
+      "context": "test",
+      "seed": 1,
+      "thread_id": "0",
+      "acquired_at": "2025-01-01T00:00:00Z",
+      "released_at": "2025-01-01T00:00:01Z",
+      "duration_ms": 5,
+      "stability_score": 1
+    },
+    {
+      "context": "test",
+      "seed": 1,
+      "thread_id": "0",
+      "acquired_at": "2025-01-01T00:00:00Z",
+      "released_at": "2025-01-01T00:00:01Z",
+      "duration_ms": 6,
+      "stability_score": 0.8
+    }
+  ]
+}
