@@ -1,0 +1,7 @@
+{
+  "image": "ghcr.io/rocm/dev:test@sha256:1234",
+  "digest": "sha256:1234",
+  "resolved_at": "2024-01-01T00:00:00Z",
+  "policy_mode": "strict",
+  "signer": "rocforge-ci"
+}

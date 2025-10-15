@@ -1,0 +1,8 @@
+clamp_test 3 0.00898116
+clamp_scoring_test 3 0.00722042
+clamp_aggregator_test 3 0.00734595
+rocforge_ci_mode_tests 3 0.0571001
+clamp_snapi_tests 3 0.101608
+clamp_cli_tests 3 0.0308104
+sysmon_snapi_tests 1 0.678774
+---

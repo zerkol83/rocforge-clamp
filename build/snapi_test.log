@@ -1,0 +1,40 @@
+2025-10-14T21:04:46.130105 | starting SNAPI bootstrap
+2025-10-14T21:04:46.144199 | registered extensions: anvil, clamp, crucible, diagnostics, rocsync, sysmon_snapi, telemetry
+2025-10-14T21:04:46.144254 | invoking sysmon_snapi.monitor
+2025-10-14T21:04:46.646161 | monitor status: ok
+2025-10-14T21:04:46.646236 | metric[cpu]={'percent': 3.749999999999998}
+2025-10-14T21:04:46.646261 | metric[memory]={'percent': 18.889469884566243}
+2025-10-14T21:04:46.646283 | metric[gpu]={'percent': 0.0}
+2025-10-14T21:04:46.646304 | metric[temperature]={'percent': 0.0, 'current': 0.0}
+2025-10-14T21:04:46.646324 | fingerprint state: conflicted
+2025-10-14T21:04:46.646345 | checking registry state after monitor
+2025-10-14T21:04:46.646370 | active extensions: ['diagnostics', 'clamp', 'rocsync', 'telemetry', 'sysmon_snapi', 'crucible', 'anvil']
+2025-10-14T21:04:46.646394 | SNAPI test complete
+=== sysmon_snapi monitor ===
+         _,met$$$$$gg.           zerkol@zerkol-debian13
+      ,g$$$$$$$$$$$$$$$P.        OS: Debian 13 trixie
+    ,g$$P""       """Y$$.".      Kernel: x86_64 Linux 6.12.48+deb13-amd64
+   ,$$P'              `$$$.      Uptime: 6h 24m
+  ',$$P       ,ggs.     `$$b:    Packages: 3834
+  `d$$'     ,$P"'   .    $$$     Shell: dash
+   $$P      d$'     ,    $$P     Disk: 616G / 2.4T (27%)
+   $$:      $$.   -    ,d$$'     CPU: AMD Ryzen 7 3800X 8-Core @ 16x 4.56GHz
+   $$\;      Y$b._   _,d$P'      GPU: Advanced Micro Devices, Inc. [AMD/ATI] Navi 31 [Radeon RX 7900 XT/7900 XTX/7900 GRE/7900M] (rev c8)
+   Y$$.    `.`"Y$$$$P"'          RAM: 12058MiB / 64215MiB
+   `$$b      "-.__              
+    `Y$$                        
+     `Y$$.                      
+       `$$b.                    
+         `Y$$b.                 
+            `"Y$b._             
+                `""""           
+                                
+ROCm Environment: CONFLICTED
+Base Version: 6.4.4-129
+Fingerprint: 93cfb0f58fae3e482e343faebbb9bd6c02c08cc9578154e58488ab102f4a31cd
+❌ Multiple ROCm roots detected
+❌ Missing libraries: rocthrust
+❌ Runtime probes failed (rocminfo / rocm-smi)
+--- stderr ---
+[⏹] SNAPI Stopped — sysmon_snapi
+status=ok

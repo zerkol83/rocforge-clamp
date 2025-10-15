@@ -105,6 +105,11 @@ if(Python3_Interpreter_FOUND)
         COMMAND ${Python3_EXECUTABLE} -m unittest discover -s ${CMAKE_SOURCE_DIR}/tests/cli -p "test_*.py"
     )
     set_tests_properties(clamp_cli_tests PROPERTIES ENVIRONMENT "PYTHONPATH=${PROJECT_SOURCE_DIR}")
+    add_test(
+        NAME sysmon_snapi_tests
+        COMMAND ${Python3_EXECUTABLE} -m unittest tests.snapi.test_sysmon_snapi
+    )
+    set_tests_properties(sysmon_snapi_tests PROPERTIES ENVIRONMENT "PYTHONPATH=${PROJECT_SOURCE_DIR}")
 else()
     message(WARNING "Python3 interpreter not found; skipping rocforge_ci mode tests.")
 endif()

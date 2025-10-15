@@ -8,7 +8,10 @@ and receive/return plain dictionaries to keep the integration friction-free.
 
 from __future__ import annotations
 
+import importlib
+import sys
 from dataclasses import dataclass
+from types import ModuleType
 from typing import Any, Callable, Dict, Iterable, Mapping, MutableMapping, Optional
 
 from .errors import ExtensionAlreadyRegistered, ExtensionNotFound, InvalidCommand
@@ -24,6 +27,10 @@ __all__ = [
     "describe_extension",
     "dispatch",
     "registry",
+    "unregister_extension",
+    "load_extension",
+    "unload_extension",
+    "list_loaded",
 ]
 
 CommandPayload = Mapping[str, Any]
@@ -102,8 +109,20 @@ class ExtensionRegistry:
     def extensions(self) -> Iterable[ExtensionRecord]:
         return self._registry.values()
 
+    def unregister(self, extension_id: str) -> None:
+        self._registry.pop(extension_id, None)
+
 
 _GLOBAL_REGISTRY = ExtensionRegistry()
+SNAPI_REGISTRY: Dict[str, "LoadedExtension"] = {}
+
+
+@dataclass
+class LoadedExtension:
+    module_name: str
+    module: ModuleType
+    extension_id: Optional[str]
+    record: Optional[ExtensionRecord]
 
 
 def register_extension(
@@ -144,3 +163,65 @@ def dispatch(command: str, payload: Optional[CommandPayload] = None) -> CommandR
 
 def registry() -> ExtensionRegistry:
     return _GLOBAL_REGISTRY
+
+
+def unregister_extension(extension_id: str) -> None:
+    """
+    Remove a previously registered extension from the command registry.
+    """
+
+    _GLOBAL_REGISTRY.unregister(extension_id)
+
+
+def _normalize_module_name(module_name: str) -> tuple[str, str]:
+    if not module_name:
+        raise ValueError("module_name must be provided")
+    if "." not in module_name:
+        qualified = f"extensions.{module_name}"
+    else:
+        qualified = module_name
+    key = qualified.split(".", maxsplit=1)[-1]
+    return qualified, key
+
+
+def load_extension(module_name: str) -> Optional[ExtensionRecord]:
+    qualified, key = _normalize_module_name(module_name)
+    if key in SNAPI_REGISTRY:
+        return SNAPI_REGISTRY[key].record
+
+    module = importlib.import_module(qualified)
+    register_fn = getattr(module, "register", None)
+    record: Optional[ExtensionRecord] = None
+    extension_id: Optional[str] = None
+    if callable(register_fn):
+        record = register_fn()
+        if isinstance(record, ExtensionRecord):
+            extension_id = record.extension_id
+    SNAPI_REGISTRY[key] = LoadedExtension(
+        module_name=qualified,
+        module=module,
+        extension_id=extension_id,
+        record=record,
+    )
+    print(f"[✓] SNAPI loaded: {key}")
+    return record
+
+
+def unload_extension(module_name: str) -> None:
+    qualified, key = _normalize_module_name(module_name)
+    handle = SNAPI_REGISTRY.pop(key, None)
+    if not handle:
+        return
+
+    unregister_fn = getattr(handle.module, "unregister", None)
+    if callable(unregister_fn):
+        unregister_fn()
+    if handle.extension_id:
+        _GLOBAL_REGISTRY.unregister(handle.extension_id)
+    sys.modules.pop(handle.module.__name__, None)
+    sys.modules.pop(qualified, None)
+    print(f"[⏹] SNAPI unloaded: {key}")
+
+
+def list_loaded() -> list[str]:
+    return list(SNAPI_REGISTRY.keys())

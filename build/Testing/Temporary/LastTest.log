@@ -1,0 +1,182 @@
+Start testing: Oct 14 21:06 CDT
+----------------------------------------------------------
+1/7 Testing: clamp_test
+1/7 Test: clamp_test
+Command: "/home/zerkol/Dev/rocforge/clamp/build/clamp_test"
+Directory: /home/zerkol/Dev/rocforge/clamp/build
+"clamp_test" start time: Oct 14 21:06 CDT
+Output:
+----------------------------------------------------------
+[ClampAnchor] Unlocked -> Locked @ 2025-10-14 21:06:25 | Lock acquired for context 'scoped-context', seed 12808462179647648691
+[ClampAnchor] Locked -> Released @ 2025-10-14 21:06:25 | ~ClampAnchor releasing context 'scoped-context'
+[ClampAnchor] Released -> Unlocked @ 2025-10-14 21:06:25 | ~ClampAnchor anchor reset to unlocked
+[ClampAnchor] Unlocked -> Locked @ 2025-10-14 21:06:25 | Lock acquired for context 'unit-test', seed 12808462179648060548
+[ClampAnchor] Locked -> Released @ 2025-10-14 21:06:25 | release() releasing context 'unit-test'
+[ClampAnchor] Released -> Unlocked @ 2025-10-14 21:06:25 | release() anchor reset to unlocked
+[ClampAnchor] Unlocked -> Locked @ 2025-10-14 21:06:25 | Lock acquired for context 'cycle-test', seed 12808462179648053013
+[ClampAnchor] Locked -> Released @ 2025-10-14 21:06:25 | release() releasing context 'cycle-test'
+[ClampAnchor] Released -> Unlocked @ 2025-10-14 21:06:25 | release() anchor reset to unlocked
+[ClampAnchor] Unlocked -> Locked @ 2025-10-14 21:06:25 | Lock acquired for context 'cycle-test', seed 12808462179644916789
+[ClampAnchor] Locked -> Released @ 2025-10-14 21:06:25 | release() releasing context 'cycle-test'
+[ClampAnchor] Released -> Unlocked @ 2025-10-14 21:06:25 | release() anchor reset to unlocked
+[ClampAnchor] Unlocked -> Locked @ [ClampAnchor] Unlocked -> Locked @ 2025-10-14 [ClampAnchor] Unlocked -> Locked21:06:252025-10-14 [ClampAnchor] Unlocked21:06:25 | Lock acquired for context 'thread-2', seed 14540348429585262684
+ @  | Lock acquired for context 'thread-1', seed 7137305099133734756
+ -> Locked @ 2025-10-14 21:06:25 | 2025-10-14Lock acquired for context 'thread-3', seed 14338535642825124961 
+21:06:25 | Lock acquired for context 'thread-0', seed 5731788502656262122
+[ClampAnchor] Locked -> Released @ 2025-10-14 21:06:25 | release() releasing context 'thread-1'
+[ClampAnchor] Released -> Unlocked @ 2025-10-14 21:06:25 | release() anchor reset to unlocked
+[ClampAnchor] Locked -> Released @ 2025-10-14 21:06:25 | release() releasing context 'thread-3'
+[ClampAnchor] Released -> Unlocked @ 2025-10-14 21:06:25 | release() anchor reset to unlocked
+[ClampAnchor] Locked -> Released @ [ClampAnchor] Locked -> Released @ 2025-10-14 21:06:252025-10-14  | release() releasing context 'thread-0'
+21:06:25 | release() releasing context 'thread-2'
+[ClampAnchor] Released -> Unlocked @ 2025-10-14 [ClampAnchor] 21:06:25Released |  -> release() anchor reset to unlockedUnlocked
+ @ 2025-10-14 21:06:25 | release() anchor reset to unlocked
+<end of output>
+Test time =   0.03 sec
+----------------------------------------------------------
+Test Passed.
+"clamp_test" end time: Oct 14 21:06 CDT
+"clamp_test" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/7 Testing: clamp_scoring_test
+2/7 Test: clamp_scoring_test
+Command: "/home/zerkol/Dev/rocforge/clamp/build/clamp_scoring_test"
+Directory: /home/zerkol/Dev/rocforge/clamp/build
+"clamp_scoring_test" start time: Oct 14 21:06 CDT
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"clamp_scoring_test" end time: Oct 14 21:06 CDT
+"clamp_scoring_test" time elapsed: 00:00:00
+----------------------------------------------------------
+
+3/7 Testing: clamp_aggregator_test
+3/7 Test: clamp_aggregator_test
+Command: "/home/zerkol/Dev/rocforge/clamp/build/clamp_aggregator_test"
+Directory: /home/zerkol/Dev/rocforge/clamp/build
+"clamp_aggregator_test" start time: Oct 14 21:06 CDT
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"clamp_aggregator_test" end time: Oct 14 21:06 CDT
+"clamp_aggregator_test" time elapsed: 00:00:00
+----------------------------------------------------------
+
+4/7 Testing: rocforge_ci_mode_tests
+4/7 Test: rocforge_ci_mode_tests
+Command: "/usr/bin/python3" "/home/zerkol/Dev/rocforge/clamp/ci/tests/test_ci_mode.py"
+Directory: /home/zerkol/Dev/rocforge/clamp/build
+"rocforge_ci_mode_tests" start time: Oct 14 21:06 CDT
+Output:
+----------------------------------------------------------
+...
+----------------------------------------------------------------------
+Ran 3 tests in 0.010s
+
+OK
+[offline] Using matrix ci/rocm_matrix.yml
+[resolve] offline mode selected for ubuntu-20.04
+ghcr.io/zerkol83/rocm-dev:6.4.4-ubuntu-20.04
+[offline] verify ghcr.io/zerkol83/rocm-dev:6.4.4-ubuntu-22.04
+{
+  "image": "ghcr.io/zerkol83/rocm-dev:6.4.4-ubuntu-22.04",
+  "mirror": "ghcr.io/zerkol83/rocm-dev:6.4.4-ubuntu-22.04",
+  "canonical": "rocforge/rocm-dev:6.4.4-ubuntu-22.04",
+  "tarball": "images/rocm-dev-6.4.4-ubuntu-22.04.tar.gz",
+  "mode": "offline",
+  "sha256": "dc6c257646e1ed09f4eacff5594b12b8adb4c31f6917d337ca09925d536e629a"
+}
+[offline] verify ghcr.io/zerkol83/rocm-dev:6.4.4-ubuntu-20.04
+{
+  "image": "ghcr.io/zerkol83/rocm-dev:6.4.4-ubuntu-20.04",
+  "mirror": "ghcr.io/zerkol83/rocm-dev:6.4.4-ubuntu-20.04",
+  "canonical": "rocforge/rocm-dev:6.4.4-ubuntu-20.04",
+  "tarball": "images/rocm-dev-6.4.4-ubuntu-20.04.tar.gz",
+  "mode": "offline",
+  "sha256": "dc6c257646e1ed09f4eacff5594b12b8adb4c31f6917d337ca09925d536e629a"
+}
+[offline] bootstrap complete
+{"mode": "offline", "snapshot": "build/rocm_snapshot.json", "timestamp": "2025-10-15T02:06:25Z"}
+[offline] Clamp: manifest not found; skipping verification.
+[smart] Local ROCm image tarball detected; preferring cached mode.
+{"mode": "local", "snapshot": "build/rocm_snapshot.json", "timestamp": "2025-10-15T02:06:25Z"}
+[smart] bootstrap completed (mode=local, image=ghcr.io/zerkol83/rocm-dev:6.4.4-ubuntu-20.04).
+[smart] Clamp: manifest not found; skipping verification.
+<end of output>
+Test time =   0.17 sec
+----------------------------------------------------------
+Test Passed.
+"rocforge_ci_mode_tests" end time: Oct 14 21:06 CDT
+"rocforge_ci_mode_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+5/7 Testing: clamp_snapi_tests
+5/7 Test: clamp_snapi_tests
+Command: "/usr/bin/python3" "-m" "unittest" "discover" "-s" "/home/zerkol/Dev/rocforge/clamp/tests/clamp" "-p" "test_*.py"
+Directory: /home/zerkol/Dev/rocforge/clamp/build
+"clamp_snapi_tests" start time: Oct 14 21:06 CDT
+Output:
+----------------------------------------------------------
+[✓] SNAPI Loaded — sysmon_snapi v0.4.0
+...
+----------------------------------------------------------------------
+Ran 3 tests in 0.230s
+
+OK
+<end of output>
+Test time =   0.30 sec
+----------------------------------------------------------
+Test Passed.
+"clamp_snapi_tests" end time: Oct 14 21:06 CDT
+"clamp_snapi_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+6/7 Testing: clamp_cli_tests
+6/7 Test: clamp_cli_tests
+Command: "/usr/bin/python3" "-m" "unittest" "discover" "-s" "/home/zerkol/Dev/rocforge/clamp/tests/cli" "-p" "test_*.py"
+Directory: /home/zerkol/Dev/rocforge/clamp/build
+"clamp_cli_tests" start time: Oct 14 21:06 CDT
+Output:
+----------------------------------------------------------
+...
+----------------------------------------------------------------------
+Ran 3 tests in 0.024s
+
+OK
+<end of output>
+Test time =   0.09 sec
+----------------------------------------------------------
+Test Passed.
+"clamp_cli_tests" end time: Oct 14 21:06 CDT
+"clamp_cli_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+7/7 Testing: sysmon_snapi_tests
+7/7 Test: sysmon_snapi_tests
+Command: "/usr/bin/python3" "-m" "unittest" "tests.snapi.test_sysmon_snapi"
+Directory: /home/zerkol/Dev/rocforge/clamp/build
+"sysmon_snapi_tests" start time: Oct 14 21:06 CDT
+Output:
+----------------------------------------------------------
+[✓] SNAPI Loaded — sysmon_snapi v0.4.0
+..
+----------------------------------------------------------------------
+Ran 2 tests in 0.612s
+
+OK
+<end of output>
+Test time =   0.68 sec
+----------------------------------------------------------
+Test Passed.
+"sysmon_snapi_tests" end time: Oct 14 21:06 CDT
+"sysmon_snapi_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 14 21:06 CDT
